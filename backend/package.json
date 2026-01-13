@@ -13,6 +13,7 @@
     "setup": "npm run migrate && npm run seed"
   },
   "dependencies": {
+    "@types/node": "^20.19.27",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -31,7 +32,6 @@
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.8",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/node": "^20.19.27",
     "@types/pg": "^8.10.7",
     "@types/uuid": "^9.0.7",
     "jest": "^29.7.0",
