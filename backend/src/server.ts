@@ -41,8 +41,8 @@ app.use(cors({
     ? [
         'https://step-scientists.vercel.app',
         'https://step-scientists-*.vercel.app', // Preview deployments
-        process.env.CORS_ORIGIN
-      ].filter(Boolean)
+        process.env.CORS_ORIGIN || ''
+      ].filter(origin => origin && origin.length > 0)
     : [
         'http://localhost:3000', 
         'http://10.0.2.2:3000', // Android emulator

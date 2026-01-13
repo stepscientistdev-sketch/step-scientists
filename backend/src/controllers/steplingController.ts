@@ -6,7 +6,7 @@ export const steplingController = {
   // Get all steplings for a player
   async getSteplings(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       if (!playerId) {
         return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Player not authenticated' } });
       }
@@ -25,7 +25,7 @@ export const steplingController = {
   // Get a specific stepling
   async getStepling(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       const { steplingId } = req.params;
 
       if (!playerId) {
@@ -53,7 +53,7 @@ export const steplingController = {
   // Create a new stepling (used when discovering species)
   async createStepling(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       const { speciesId } = req.body;
 
       if (!playerId) {
@@ -81,7 +81,7 @@ export const steplingController = {
   // Update a stepling (level up)
   async updateStepling(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       const { steplingId } = req.params;
       const updateData = req.body;
 
@@ -110,7 +110,7 @@ export const steplingController = {
   // Fuse two steplings
   async fuseSteplings(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       const { newStepling, removedSteplingIds } = req.body;
 
       if (!playerId) {
@@ -138,7 +138,7 @@ export const steplingController = {
   // Get fusion candidates for a stepling
   async getFusionCandidates(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       const { steplingId } = req.params;
 
       if (!playerId) {
@@ -159,7 +159,7 @@ export const steplingController = {
   // Level up a stepling with experience points
   async levelUpStepling(req: AuthenticatedRequest, res: Response) {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       const { steplingId } = req.params;
       const { experiencePoints } = req.body;
 
