@@ -136,11 +136,11 @@ app.get('/debug/database', async (req, res) => {
         username: player?.username
       },
       steplings: {
-        total_count: parseInt(steplingsCount.count),
+        total_count: parseInt(String(steplingsCount?.count || 0)),
         sample: sampleSteplings
       },
       species: {
-        total_count: parseInt(speciesCount.count),
+        total_count: parseInt(String(speciesCount?.count || 0)),
         all: allSpecies
       }
     });
@@ -450,14 +450,14 @@ app.get('/api/steplings', trainingLimiter, async (req, res) => {
         id: steplings[0].id,
         species_id: steplings[0].species_id,
         level: steplings[0].level,
-        species: steplings[0].species
+        species: (steplings[0] as any).species
       });
     } else {
       console.log(`⚠️ [STEPLINGS API] No steplings found - checking database directly...`);
       
       // Direct database check
       const directCount = await database('steplings').where('player_id', playerId).count('* as count').first();
-      console.log(`🔍 [STEPLINGS API] Direct DB count: ${directCount.count} steplings`);
+      console.log(`🔍 [STEPLINGS API] Direct DB count: ${String(directCount?.count || 0)} steplings`);
       
       const directSteplings = await database('steplings').where('player_id', playerId).select('*').limit(3);
       console.log(`🔍 [STEPLINGS API] Direct DB sample:`, directSteplings.map(s => ({ id: s.id, species_id: s.species_id, level: s.level })));
