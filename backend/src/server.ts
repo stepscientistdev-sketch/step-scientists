@@ -96,8 +96,69 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to create mobile player in production
+app.post('/debug/create-mobile-player', async (req, res) => {
+  try {
+    const playerId = MOBILE_PLAYER_ID;
+    
+    // Check if player already exists
+    const existingPlayer = await database('players').where('id', playerId).first();
+    
+    if (existingPlayer) {
+      return res.json({
+        success: true,
+        message: 'Mobile player already exists',
+        player: {
+          id: existingPlayer.id,
+          username: existingPlayer.username,
+          email: existingPlayer.email
+        }
+      });
+    }
+    
+    // Create the mobile player
+    const playerData = {
+      id: playerId,
+      username: 'mobile_player',
+      email: 'mobile@stepscientists.app',
+      password_hash: 'mobile_player_hash', // Not used for mobile
+      step_data: {
+        total_steps: 0,
+        daily_steps: 0,
+        last_updated: new Date().toISOString()
+      },
+      resources: {
+        cells: 0,
+        experience_points: 0
+      },
+      current_mode: 'discovery'
+    };
+    
+    await database('players').insert(playerData);
+    
+    // Verify creation
+    const createdPlayer = await database('players').where('id', playerId).first();
+    
+    res.json({
+      success: true,
+      message: 'Mobile player created successfully!',
+      player: {
+        id: createdPlayer.id,
+        username: createdPlayer.username,
+        email: createdPlayer.email,
+        mode: createdPlayer.current_mode
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create mobile player',
+      message: error.message
+    });
+  }
+});
 // Debug endpoint to inspect database state
-app.get('/debug/database', async (req, res) => {
   try {
     const playerId = MOBILE_PLAYER_ID;
     
