@@ -4,7 +4,9 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.hos
     : 'https://step-scientists-backend.onrender.com'; // Production Render URL
 
 var game = {
-    steps: 5000,
+    steps: 5000, // Keep for backward compatibility - will become total lifetime steps
+    dailySteps: 0, // NEW: Today's steps only (resets daily)
+    lastStepDate: null, // NEW: Track when steps were last updated
     mode: 'discovery',
     cells: 5,
     experience: 0,
@@ -25,6 +27,57 @@ var playerSteplings = [];
 var isConnected = false;
 var useMagnifyingGlass = false;
 
+// Daily step management functions
+function getTodayDateString() {
+    const today = new Date();
+    return today.getFullYear() + '-' + (today.getMonth() + 1).toString().padStart(2, '0') + '-' + today.getDate().toString().padStart(2, '0');
+}
+
+function checkDailyReset() {
+    const today = getTodayDateString();
+    
+    if (game.lastStepDate !== today) {
+        // New day detected - reset daily steps
+        if (game.lastStepDate) {
+            log('🌅 New day detected! Daily steps reset to 0');
+        }
+        game.dailySteps = 0;
+        game.lastStepDate = today;
+        saveGame();
+    }
+}
+
+function updateDailySteps(totalStepsFromGoogleFit) {
+    checkDailyReset();
+    
+    // For Google Fit, the API already gives us today's steps
+    // So we can directly use that value
+    const oldDailySteps = game.dailySteps;
+    game.dailySteps = totalStepsFromGoogleFit;
+    
+    // Also update the total lifetime steps for backward compatibility
+    if (totalStepsFromGoogleFit > game.steps) {
+        game.steps = totalStepsFromGoogleFit;
+    }
+    
+    return game.dailySteps - oldDailySteps; // Return the difference for processing
+}
+
+function addManualSteps(stepsToAdd) {
+    checkDailyReset();
+    
+    game.dailySteps += stepsToAdd;
+    game.steps += stepsToAdd; // Also update total for backward compatibility
+    
+    log('➕ Added ' + stepsToAdd + ' steps manually');
+    return stepsToAdd;
+}
+
+function getDailySteps() {
+    checkDailyReset();
+    return game.dailySteps;
+}
+
 // Initialize
 async function init() {
     try {
@@ -36,13 +89,16 @@ async function init() {
         log('Step 2: Loading game data...');
         loadGame();
         
-        log('Step 3: Updating display...');
+        log('Step 3: Checking daily reset...');
+        checkDailyReset();
+        
+        log('Step 4: Updating display...');
         updateDisplay();
         
-        log('Step 4: Loading species...');
+        log('Step 5: Loading species...');
         await loadSpecies();
         
-        log('Step 5: Loading steplings...');
+        log('Step 6: Loading steplings...');
         await loadSteplings();
         
         log('Initialization complete!');
@@ -80,25 +136,25 @@ async function testConnection() {
 
 // Add steps
 async function addSteps() {
-    var oldSteps = game.steps;
-    game.steps += 100;
+    const stepsAdded = addManualSteps(100);
+    const dailySteps = getDailySteps();
     
     if (game.mode === 'discovery') {
-        var oldCells = Math.floor(oldSteps / 1000);
-        var newCells = Math.floor(game.steps / 1000);
-        var cellsToAdd = newCells - oldCells;
+        const oldCells = Math.floor((dailySteps - stepsAdded) / 1000);
+        const newCells = Math.floor(dailySteps / 1000);
+        const cellsToAdd = newCells - oldCells;
         
         if (cellsToAdd > 0) {
             game.cells += cellsToAdd;
             log('Earned ' + cellsToAdd + ' cells!');
         } else {
-            var needed = 1000 - (game.steps % 1000);
+            const needed = 1000 - (dailySteps % 1000);
             log(needed + ' more steps for next cell');
         }
     } else {
-        var oldExp = Math.floor(oldSteps / 10);
-        var newExp = Math.floor(game.steps / 10);
-        var expToAdd = newExp - oldExp;
+        const oldExp = Math.floor((dailySteps - stepsAdded) / 10);
+        const newExp = Math.floor(dailySteps / 10);
+        const expToAdd = newExp - oldExp;
         
         if (expToAdd > 0) {
             game.experience += expToAdd;
@@ -211,6 +267,7 @@ async function inspectCell() {
         
         if (response.ok) {
             var result = await response.json();
+            console.log('🔍 Discovery API result:', result);
             
             if (result.success) {
                 var species = result.species;
@@ -218,6 +275,17 @@ async function inspectCell() {
                 if (result.isNewDiscovery) {
                     game.discoveredSpecies.push(species.id);
                     log('🎉 NEW! ' + species.rarity.toUpperCase() + ' ' + species.name + ' ' + species.emoji);
+                    
+                    // Check if a stepling was created
+                    if (result.stepling) {
+                        log('✅ Stepling created: ' + result.stepling.id);
+                    } else {
+                        log('⚠️ No stepling returned from API');
+                    }
+                    
+                    // Reload steplings to show the newly created stepling
+                    log('🔄 Reloading steplings...');
+                    await loadSteplings();
                 } else {
                     log('Found ' + species.name + ' ' + species.emoji + ' (known)');
                 }
@@ -243,92 +311,18 @@ async function inspectCell() {
 
 // Sync steps with Google Fit
 async function syncSteps() {
-    if (!window.gapi || !window.gapi.auth2) {
-        log('Google Fit not available');
-        return;
-    }
-    
     try {
-        var authInstance = window.gapi.auth2.getAuthInstance();
-        if (!authInstance.isSignedIn.get()) {
-            log('Please sign in to Google Fit first');
+        if (!googleFitService || !googleFitService.accessToken) {
+            log('❌ Google Fit not connected - please connect first');
             return;
         }
         
-        log('Syncing with Google Fit...');
-        
-        // Get today's date range
-        var now = new Date();
-        var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        var endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-        
-        var request = {
-            'aggregateBy': [{
-                'dataTypeName': 'com.google.step_count.delta',
-                'dataSourceId': 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
-            }],
-            'bucketByTime': { 'durationMillis': 86400000 }, // 1 day
-            'startTimeMillis': startOfDay.getTime(),
-            'endTimeMillis': endOfDay.getTime()
-        };
-        
-        window.gapi.client.fitness.users.dataset.aggregate({
-            'userId': 'me',
-            'resource': request
-        }).then(function(response) {
-            var totalSteps = 0;
-            if (response.result.bucket && response.result.bucket.length > 0) {
-                var bucket = response.result.bucket[0];
-                if (bucket.dataset && bucket.dataset.length > 0) {
-                    var dataset = bucket.dataset[0];
-                    if (dataset.point && dataset.point.length > 0) {
-                        totalSteps = dataset.point[0].value[0].intVal || 0;
-                    }
-                }
-            }
-            
-            var oldSteps = game.steps;
-            game.steps = totalSteps;
-            
-            if (totalSteps > oldSteps) {
-                var newSteps = totalSteps - oldSteps;
-                log('Synced! Added ' + newSteps + ' steps from Google Fit');
-                
-                // Process the new steps
-                if (game.mode === 'discovery') {
-                    var oldCells = Math.floor(oldSteps / 1000);
-                    var newCells = Math.floor(totalSteps / 1000);
-                    var cellsToAdd = newCells - oldCells;
-                    if (cellsToAdd > 0) {
-                        game.cells += cellsToAdd;
-                        log('Earned ' + cellsToAdd + ' cells from sync!');
-                    }
-                } else {
-                    var oldExp = Math.floor(oldSteps / 10);
-                    var newExp = Math.floor(totalSteps / 10);
-                    var expToAdd = newExp - oldExp;
-                    if (expToAdd > 0) {
-                        game.experience += expToAdd;
-                        log('Earned ' + expToAdd + ' experience from sync!');
-                        distributeExperienceToRoster(expToAdd);
-                    }
-                }
-                
-                checkMilestones();
-            } else {
-                log('Steps synced: ' + totalSteps + ' (no change)');
-            }
-            
-            updateDisplay();
-            saveGame();
-        }).catch(function(error) {
-            console.error('Google Fit sync error:', error);
-            log('Sync failed: ' + (error.result?.error?.message || error.message || 'Unknown error'));
-        });
+        log('🔄 Syncing with Google Fit...');
+        await loadGoogleFitData();
         
     } catch (error) {
         console.error('Sync error:', error);
-        log('Sync error: ' + error.message);
+        log('❌ Sync failed: ' + error.message);
     }
 }
 
@@ -951,7 +945,7 @@ function hideSteplings() {
 }
 
 // Debug steplings
-function debugSteplings() {
+async function debugSteplings() {
     console.log('=== STEPLINGS DEBUG ===');
     console.log('playerSteplings:', playerSteplings);
     console.log('playerSteplings.length:', playerSteplings.length);
@@ -965,10 +959,120 @@ function debugSteplings() {
     console.log('steplings-section element:', section);
     console.log('steplings-section display:', section ? section.style.display : 'null');
     
-    alert('Debug info logged to console. Check browser dev tools.');
+    // Test API endpoints
+    log('🔧 Starting comprehensive debug tests...');
+    let debugSummary = [];
     
-    // Force refresh
-    loadSteplings();
+    try {
+        // Test backend health
+        const healthResponse = await fetch(API_BASE + '/health');
+        const healthStatus = healthResponse.ok ? '✅ Backend Online' : '❌ Backend Error';
+        debugSummary.push(healthStatus);
+        console.log('Health check:', healthResponse.status, healthResponse.ok);
+        log('🏥 Backend Health: ' + healthResponse.status + ' ' + (healthResponse.ok ? 'OK' : 'FAILED'));
+        
+        // Test steplings endpoint with detailed logging
+        log('📡 Testing steplings API...');
+        const steplingsResponse = await fetch(API_BASE + '/api/steplings');
+        console.log('📡 Steplings API status:', steplingsResponse.status);
+        log('📡 Steplings API Status: ' + steplingsResponse.status);
+        
+        if (steplingsResponse.ok) {
+            const steplingsResult = await steplingsResponse.json();
+            const steplingCount = steplingsResult.data ? steplingsResult.data.length : 0;
+            debugSummary.push(`📊 ${steplingCount} steplings in DB`);
+            console.log('📊 Steplings API result:', steplingsResult);
+            console.log('📈 Steplings count:', steplingCount);
+            log('📊 Steplings Found: ' + steplingCount);
+            
+            // Show detailed stepling info
+            if (steplingsResult.data && steplingsResult.data.length > 0) {
+                log('📋 Steplings Details:');
+                for (let i = 0; i < Math.min(3, steplingsResult.data.length); i++) {
+                    const s = steplingsResult.data[i];
+                    const species = s.species || { name: 'Unknown' };
+                    log(`  ${i+1}. ${species.name} Lv.${s.level} F.${s.fusion_level}`);
+                }
+                if (steplingsResult.data.length > 3) {
+                    log(`  ... and ${steplingsResult.data.length - 3} more`);
+                }
+            } else {
+                log('📋 No steplings found in database');
+            }
+        } else {
+            debugSummary.push('❌ Steplings API failed');
+            const errorText = await steplingsResponse.text();
+            console.log('❌ Steplings API error:', errorText);
+            log('❌ Steplings API Error: ' + errorText);
+        }
+        
+        // Test discovery endpoint to see if steplings are being created
+        log('🔬 Testing discovery API (creates steplings)...');
+        const discoveryResponse = await fetch(API_BASE + '/api/species/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: '021cb11f-482a-44d2-b289-110400f23562',
+                magnifyingGlass: null
+            })
+        });
+        
+        console.log('🧪 Discovery API status:', discoveryResponse.status);
+        log('🧪 Discovery API Status: ' + discoveryResponse.status);
+        
+        if (discoveryResponse.ok) {
+            const discoveryResult = await discoveryResponse.json();
+            debugSummary.push('✅ Discovery API works');
+            console.log('🎯 Discovery result:', discoveryResult);
+            
+            if (discoveryResult.stepling) {
+                log('🎉 Discovery created stepling: ' + (discoveryResult.species?.name || 'Unknown'));
+            } else {
+                log('⚠️ Discovery succeeded but no stepling created');
+            }
+        } else {
+            debugSummary.push('❌ Discovery API failed');
+            const discoveryError = await discoveryResponse.text();
+            console.log('❌ Discovery API error:', discoveryError);
+            log('❌ Discovery API Error: ' + discoveryError);
+        }
+        
+        // Test if we can create a stepling directly
+        log('🔨 Testing direct stepling creation...');
+        try {
+            const createResponse = await fetch(API_BASE + '/api/steplings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    speciesId: 'd4a09c90-17ea-4778-85db-3b83c54654ef' // Grasshopper ID
+                })
+            });
+            
+            log('🔨 Direct creation status: ' + createResponse.status);
+            if (createResponse.ok) {
+                const createResult = await createResponse.json();
+                log('🔨 Direct creation successful');
+                console.log('🔨 Direct creation result:', createResult);
+            } else {
+                const createError = await createResponse.text();
+                log('🔨 Direct creation failed: ' + createError);
+                console.log('🔨 Direct creation error:', createError);
+            }
+        } catch (createError) {
+            log('🔨 Direct creation error: ' + createError.message);
+        }
+        
+        // Show summary in game log
+        log('🔧 Debug Summary: ' + debugSummary.join(' | '));
+        
+    } catch (error) {
+        console.log('💥 Debug error:', error);
+        log('💥 Debug failed: ' + error.message);
+    }
+    
+    // Force refresh steplings after debug
+    log('🔄 Refreshing steplings after debug...');
+    await loadSteplings();
 }
 
 // Load species
@@ -1308,7 +1412,9 @@ function selectGlassTier(tier) {
 
 // Update display
 function updateDisplay() {
-    document.getElementById('step-count').innerHTML = game.steps;
+    // Show daily steps in the main display, with total in parentheses
+    const dailySteps = getDailySteps();
+    document.getElementById('step-count').innerHTML = dailySteps + ' <small>(today)</small>';
     document.getElementById('cells').innerHTML = game.cells;
     document.getElementById('exp').innerHTML = game.experience;
     document.getElementById('exp-bank').innerHTML = game.experienceBank;
@@ -1319,7 +1425,7 @@ function updateDisplay() {
     
     if (game.mode === 'discovery') {
         document.getElementById('mode-title').innerHTML = '🔍 Discovery Mode';
-        document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell';
+        document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell (daily progress)';
     } else {
         document.getElementById('mode-title').innerHTML = '💪 Training Mode';
         var bankText = game.experienceBank > 0 ? ' (+' + game.experienceBank + ' banked)' : '';
@@ -1715,153 +1821,266 @@ function log(message) {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
-// Google Fit Integration
-function connectGoogleFit() {
-    if (typeof gapi === 'undefined') {
-        log('Google API not loaded. Loading...');
-        loadGoogleAPI();
-        return;
-    }
-    
-    log('Connecting to Google Fit...');
-    
-    gapi.load('auth2', function() {
-        gapi.auth2.init({
-            client_id: '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com'
-        }).then(function() {
-            var authInstance = gapi.auth2.getAuthInstance();
+// Google Fit Integration - Modern Implementation with Token Persistence
+let googleFitService = null;
+
+async function initializeGoogleFit() {
+    try {
+        log('Initializing Google Fit service...');
+        
+        googleFitService = {
+            initialized: false,
+            accessToken: null,
             
-            if (authInstance.isSignedIn.get()) {
-                log('Already signed in to Google Fit');
-                updateGoogleFitStatus(true);
-                loadGoogleFitData();
-            } else {
-                authInstance.signIn({
-                    scope: 'https://www.googleapis.com/auth/fitness.activity.read'
-                }).then(function() {
-                    log('Successfully signed in to Google Fit');
-                    updateGoogleFitStatus(true);
-                    loadGoogleFitData();
-                }).catch(function(error) {
-                    console.error('Google Fit sign in error:', error);
-                    log('Failed to sign in to Google Fit: ' + (error.error || 'Unknown error'));
-                    updateGoogleFitStatus(false);
+            async initialize() {
+                // Load Google Identity Services
+                if (!window.google?.accounts) {
+                    await loadScript('https://accounts.google.com/gsi/client');
+                }
+                if (!window.gapi) {
+                    await loadScript('https://apis.google.com/js/api.js');
+                }
+                
+                // Initialize gapi client
+                await new Promise((resolve) => {
+                    window.gapi.load('client', async () => {
+                        await window.gapi.client.init({
+                            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/fitness/v1/rest'],
+                        });
+                        resolve();
+                    });
                 });
+                
+                this.initialized = true;
+                
+                // Try to restore saved token
+                const savedToken = localStorage.getItem('googleFitToken');
+                const tokenExpiry = localStorage.getItem('googleFitTokenExpiry');
+                
+                if (savedToken && tokenExpiry) {
+                    const now = Date.now();
+                    const expiry = parseInt(tokenExpiry);
+                    
+                    if (now < expiry) {
+                        // Token is still valid
+                        this.accessToken = savedToken;
+                        log('✅ Restored Google Fit session');
+                        updateGoogleFitStatus(true);
+                        return true;
+                    } else {
+                        // Token expired, clear it
+                        localStorage.removeItem('googleFitToken');
+                        localStorage.removeItem('googleFitTokenExpiry');
+                        log('🔄 Google Fit token expired, please reconnect');
+                    }
+                }
+                
+                return true;
+            },
+            
+            async requestPermission() {
+                if (!this.initialized) {
+                    await this.initialize();
+                }
+                
+                const CLIENT_ID = '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com';
+                const SCOPES = 'https://www.googleapis.com/auth/fitness.activity.read';
+                
+                return new Promise((resolve, reject) => {
+                    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID,
+                        scope: SCOPES,
+                        callback: (tokenResponse) => {
+                            if (tokenResponse.access_token) {
+                                this.accessToken = tokenResponse.access_token;
+                                
+                                // Save token with expiry (tokens typically last 1 hour)
+                                const expiryTime = Date.now() + (3600 * 1000); // 1 hour from now
+                                localStorage.setItem('googleFitToken', tokenResponse.access_token);
+                                localStorage.setItem('googleFitTokenExpiry', expiryTime.toString());
+                                
+                                log('✅ Successfully connected to Google Fit!');
+                                updateGoogleFitStatus(true);
+                                resolve(true);
+                            } else {
+                                reject(new Error('No access token received'));
+                            }
+                        },
+                        error_callback: (error) => {
+                            log('❌ Failed to connect to Google Fit: ' + error.error);
+                            updateGoogleFitStatus(false);
+                            reject(error);
+                        }
+                    });
+                    
+                    tokenClient.requestAccessToken();
+                });
+            },
+            
+            async getCurrentSteps() {
+                if (!this.accessToken) {
+                    throw new Error('Not authorized - please connect to Google Fit first');
+                }
+                
+                const today = new Date();
+                const startOfDay = new Date(today);
+                startOfDay.setHours(0, 0, 0, 0);
+                
+                const endOfDay = new Date(today);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const request = {
+                    aggregateBy: [{
+                        dataTypeName: 'com.google.step_count.delta'
+                    }],
+                    bucketByTime: { durationMillis: 86400000 },
+                    startTimeMillis: startOfDay.getTime(),
+                    endTimeMillis: endOfDay.getTime()
+                };
+
+                try {
+                    const response = await window.gapi.client.request({
+                        path: 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+                        method: 'POST',
+                        body: request,
+                        headers: {
+                            'Authorization': `Bearer ${this.accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    let totalSteps = 0;
+                    if (response.result.bucket && response.result.bucket.length > 0) {
+                        response.result.bucket.forEach(bucket => {
+                            if (bucket.dataset && bucket.dataset.length > 0) {
+                                bucket.dataset.forEach(dataset => {
+                                    if (dataset.point && dataset.point.length > 0) {
+                                        dataset.point.forEach(point => {
+                                            if (point.value && point.value.length > 0) {
+                                                totalSteps += point.value[0].intVal || 0;
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    return totalSteps;
+                } catch (error) {
+                    // If token is invalid, clear it and require re-auth
+                    if (error.status === 401 || error.status === 403) {
+                        this.accessToken = null;
+                        localStorage.removeItem('googleFitToken');
+                        localStorage.removeItem('googleFitTokenExpiry');
+                        updateGoogleFitStatus(false);
+                        throw new Error('Google Fit session expired - please reconnect');
+                    }
+                    throw error;
+                }
+            },
+            
+            disconnect() {
+                this.accessToken = null;
+                localStorage.removeItem('googleFitToken');
+                localStorage.removeItem('googleFitTokenExpiry');
+                updateGoogleFitStatus(false);
+                log('🔌 Disconnected from Google Fit');
             }
-        }).catch(function(error) {
-            console.error('Google API init error:', error);
-            log('Failed to initialize Google API: ' + (error.error || 'Unknown error'));
-            updateGoogleFitStatus(false);
-        });
-    });
+        };
+        
+        await googleFitService.initialize();
+        log('✅ Google Fit service initialized successfully!');
+        
+    } catch (error) {
+        console.error('Google Fit initialization error:', error);
+        log('❌ Failed to initialize Google Fit: ' + error.message);
+    }
 }
 
-function loadGoogleAPI() {
-    var script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.onload = function() {
-        gapi.load('client:auth2', function() {
-            gapi.client.init({
-                apiKey: 'AIzaSyBqKGVJKzKzKzKzKzKzKzKzKzKzKzKzKzK', // This would be your API key
-                clientId: '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com',
-                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/fitness/v1/rest'],
-                scope: 'https://www.googleapis.com/auth/fitness.activity.read'
-            }).then(function() {
-                log('Google API loaded successfully');
-                connectGoogleFit();
-            }).catch(function(error) {
-                console.error('Google API client init error:', error);
-                log('Failed to initialize Google API client');
-            });
-        });
-    };
-    script.onerror = function() {
-        log('Failed to load Google API script');
-    };
-    document.head.appendChild(script);
+async function connectGoogleFit() {
+    try {
+        if (!googleFitService) {
+            await initializeGoogleFit();
+        }
+        
+        log('🔗 Connecting to Google Fit...');
+        await googleFitService.requestPermission();
+        
+        // Load initial data after successful connection
+        await loadGoogleFitData();
+        
+    } catch (error) {
+        console.error('Google Fit connection error:', error);
+        log('❌ Failed to connect to Google Fit: ' + error.message);
+        updateGoogleFitStatus(false);
+    }
+}
+
+async function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
 }
 
 function updateGoogleFitStatus(connected) {
     var statusEl = document.getElementById('google-fit-status');
-    if (connected) {
-        statusEl.textContent = '✅ Google Fit Connected';
-        statusEl.className = 'google-fit-status connected';
-    } else {
-        statusEl.textContent = '🏥 Tap to connect Google Fit';
-        statusEl.className = 'google-fit-status disconnected';
+    if (statusEl) {
+        if (connected) {
+            statusEl.textContent = '✅ Google Fit Connected (tap to disconnect)';
+            statusEl.className = 'google-fit-status connected';
+            statusEl.onclick = function() {
+                if (googleFitService) {
+                    googleFitService.disconnect();
+                }
+            };
+        } else {
+            statusEl.textContent = '🏥 Tap to connect Google Fit';
+            statusEl.className = 'google-fit-status disconnected';
+            statusEl.onclick = connectGoogleFit;
+        }
     }
 }
 
-function loadGoogleFitData() {
-    if (typeof gapi === 'undefined' || !gapi.auth2) {
-        log('Google API not available');
-        return;
-    }
-    
-    var authInstance = gapi.auth2.getAuthInstance();
-    if (!authInstance.isSignedIn.get()) {
-        log('Not signed in to Google Fit');
-        return;
-    }
-    
-    log('Loading step data from Google Fit...');
-    
-    // Get today's date range
-    var now = new Date();
-    var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-    
-    var request = {
-        'aggregateBy': [{
-            'dataTypeName': 'com.google.step_count.delta',
-            'dataSourceId': 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
-        }],
-        'bucketByTime': { 'durationMillis': 86400000 }, // 1 day
-        'startTimeMillis': startOfDay.getTime(),
-        'endTimeMillis': endOfDay.getTime()
-    };
-    
-    gapi.client.fitness.users.dataset.aggregate({
-        'userId': 'me',
-        'resource': request
-    }).then(function(response) {
-        var totalSteps = 0;
-        if (response.result.bucket && response.result.bucket.length > 0) {
-            var bucket = response.result.bucket[0];
-            if (bucket.dataset && bucket.dataset.length > 0) {
-                var dataset = bucket.dataset[0];
-                if (dataset.point && dataset.point.length > 0) {
-                    totalSteps = dataset.point[0].value[0].intVal || 0;
-                }
-            }
+async function loadGoogleFitData() {
+    try {
+        if (!googleFitService || !googleFitService.accessToken) {
+            log('❌ Google Fit not connected');
+            return;
         }
         
-        log('Google Fit: ' + totalSteps + ' steps today');
+        log('📊 Loading step data from Google Fit...');
         
-        // Update game steps if Google Fit has more
-        if (totalSteps > game.steps) {
-            var oldSteps = game.steps;
-            game.steps = totalSteps;
+        const totalStepsToday = await googleFitService.getCurrentSteps();
+        log('📱 Google Fit: ' + totalStepsToday + ' steps today');
+        
+        // Update daily steps and get the difference for processing
+        const oldDailySteps = getDailySteps();
+        const stepDifference = updateDailySteps(totalStepsToday);
+        
+        if (stepDifference > 0) {
+            log('🔄 Synced ' + stepDifference + ' new steps from Google Fit!');
             
-            var newSteps = totalSteps - oldSteps;
-            log('Synced ' + newSteps + ' steps from Google Fit!');
-            
-            // Process the new steps
+            // Process the new steps for game mechanics
             if (game.mode === 'discovery') {
-                var oldCells = Math.floor(oldSteps / 1000);
-                var newCells = Math.floor(totalSteps / 1000);
-                var cellsToAdd = newCells - oldCells;
+                const oldCells = Math.floor(oldDailySteps / 1000);
+                const newCells = Math.floor(totalStepsToday / 1000);
+                const cellsToAdd = newCells - oldCells;
                 if (cellsToAdd > 0) {
                     game.cells += cellsToAdd;
-                    log('Earned ' + cellsToAdd + ' cells from sync!');
+                    log('💎 Earned ' + cellsToAdd + ' cells from sync!');
                 }
             } else {
-                var oldExp = Math.floor(oldSteps / 10);
-                var newExp = Math.floor(totalSteps / 10);
-                var expToAdd = newExp - oldExp;
+                const oldExp = Math.floor(oldDailySteps / 10);
+                const newExp = Math.floor(totalStepsToday / 10);
+                const expToAdd = newExp - oldExp;
                 if (expToAdd > 0) {
                     game.experience += expToAdd;
-                    log('Earned ' + expToAdd + ' experience from sync!');
+                    log('⭐ Earned ' + expToAdd + ' experience from sync!');
                     distributeExperienceToRoster(expToAdd);
                 }
             }
@@ -1869,13 +2088,53 @@ function loadGoogleFitData() {
             checkMilestones();
             updateDisplay();
             saveGame();
+        } else if (stepDifference < 0) {
+            // Handle case where Google Fit shows fewer steps (shouldn't happen normally)
+            log('⚠️ Google Fit shows fewer steps than before - keeping current progress');
+        } else {
+            log('✅ Steps already up to date');
         }
         
-    }).catch(function(error) {
+    } catch (error) {
         console.error('Google Fit data error:', error);
-        log('Failed to load Google Fit data: ' + (error.result?.error?.message || 'Unknown error'));
-    });
+        
+        if (error.message.includes('session expired') || error.message.includes('reconnect')) {
+            log('🔄 ' + error.message);
+        } else {
+            log('❌ Failed to load Google Fit data: ' + error.message);
+            updateGoogleFitStatus(false);
+        }
+    }
 }
+
+// Initialize Google Fit service when the app starts
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Google Fit after a short delay to let the main app load first
+    setTimeout(initializeGoogleFit, 1000);
+});
+
+// Make debug function globally accessible
+window.debugSteplings = debugSteplings;
+
+// Quick debug function accessible from console
+window.quickDebug = async function() {
+    console.log('=== QUICK DEBUG ===');
+    console.log('Backend URL:', API_BASE);
+    console.log('Connected:', isConnected);
+    console.log('Steplings count:', playerSteplings.length);
+    
+    // Test backend connection
+    try {
+        const response = await fetch(API_BASE + '/health');
+        console.log('Backend health:', response.status, response.ok);
+    } catch (error) {
+        console.log('Backend health error:', error.message);
+    }
+    
+    // Run full debug
+    await debugSteplings();
+};
+
 // Service Worker Management
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {

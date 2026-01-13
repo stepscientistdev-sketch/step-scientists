@@ -25,7 +25,7 @@ class SteplingServiceImpl {
           'species.rarity_tier as species_rarity'
         );
 
-      return steplings.map(this.mapDbSteplingToSteplingWithSpecies);
+      return steplings.map((stepling) => this.mapDbSteplingToSteplingWithSpecies(stepling));
     } catch (error) {
       console.error('Error getting player steplings:', error);
       throw new Error('Failed to retrieve steplings');

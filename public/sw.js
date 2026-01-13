@@ -1,5 +1,5 @@
 // Step Scientists Service Worker
-const CACHE_NAME = 'step-scientists-v2';
+const CACHE_NAME = 'step-scientists-v3';
 const urlsToCache = [
   '/',
   '/index.html',

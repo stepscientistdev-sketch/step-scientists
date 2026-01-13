@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stepling Debug - Step Scientists</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            margin: 5px;
+        }
+        .btn:hover { background: rgba(255,255,255,0.3); }
+        .btn-primary { background: rgba(76, 175, 80, 0.8); }
+        .btn-warning { background: rgba(255, 193, 7, 0.8); }
+        .btn-danger { background: rgba(244, 67, 54, 0.8); }
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .status.success { background: rgba(76, 175, 80, 0.3); }
+        .status.error { background: rgba(244, 67, 54, 0.3); }
+        .status.info { background: rgba(33, 150, 243, 0.3); }
+        .status.warning { background: rgba(255, 193, 7, 0.3); }
+        .code {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Stepling Debug Tool</h1>
+            <p>Comprehensive debugging for stepling issues</p>
+            <button class="btn btn-primary" onclick="window.location.href='https://step-scientists.vercel.app'">← Back to Game</button>
+        </div>
+
+        <div class="section">
+            <h2>🏥 Backend Health Check</h2>
+            <button class="btn btn-primary" onclick="testBackendHealth()">Test Backend</button>
+            <div id="health-status"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Steplings API Test</h2>
+            <button class="btn btn-primary" onclick="testSteplingsAPI()">Test Steplings API</button>
+            <div id="steplings-status"></div>
+            <div id="steplings-data"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔬 Discovery API Test</h2>
+            <button class="btn btn-primary" onclick="testDiscoveryAPI()">Test Discovery (Creates Stepling)</button>
+            <div id="discovery-status"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔨 Direct Stepling Creation</h2>
+            <button class="btn btn-warning" onclick="createTestStepling()">Create Test Stepling</button>
+            <div id="creation-status"></div>
+        </div>
+
+        <div class="section">
+            <h2>🗄️ Database Direct Query</h2>
+            <button class="btn btn-primary" onclick="queryDatabase()">Query Database</button>
+            <div id="database-status"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔄 Full Diagnostic</h2>
+            <button class="btn btn-danger" onclick="runFullDiagnostic()">Run All Tests</button>
+            <div id="diagnostic-status"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://step-scientists-backend.onrender.com';
+        const PLAYER_ID = '021cb11f-482a-44d2-b289-110400f23562';
+
+        function setStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function appendStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML += `<div class="status ${type}">${message}</div>`;
+        }
+
+        function setCode(elementId, data) {
+            const element = document.getElementById(elementId);
+            element.innerHTML += `<div class="code">${JSON.stringify(data, null, 2)}</div>`;
+        }
+
+        async function testBackendHealth() {
+            setStatus('health-status', '🔄 Testing backend health...', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    setStatus('health-status', `✅ Backend is healthy! Status: ${response.status}`, 'success');
+                    setCode('health-status', data);
+                } else {
+                    setStatus('health-status', `❌ Backend error: ${response.status}`, 'error');
+                    setCode('health-status', data);
+                }
+            } catch (error) {
+                setStatus('health-status', `💥 Connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSteplingsAPI() {
+            setStatus('steplings-status', '🔄 Testing steplings API...', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/steplings');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const count = data.data ? data.data.length : 0;
+                    setStatus('steplings-status', `✅ Steplings API works! Found ${count} steplings`, 'success');
+                    setCode('steplings-status', data);
+                    
+                    if (count > 0) {
+                        let steplingsList = '<div class="grid">';
+                        data.data.slice(0, 6).forEach((s, i) => {
+                            const species = s.species || { name: 'Unknown', emoji: '❓' };
+                            steplingsList += `
+                                <div class="card">
+                                    <div style="font-size: 24px;">${species.emoji}</div>
+                                    <div><strong>${species.name}</strong></div>
+                                    <div>Level ${s.level}/${s.fusion_level * 10}</div>
+                                    <div>Fusion ${s.fusion_level}</div>
+                                </div>
+                            `;
+                        });
+                        steplingsList += '</div>';
+                        document.getElementById('steplings-data').innerHTML = steplingsList;
+                    } else {
+                        document.getElementById('steplings-data').innerHTML = '<div class="status warning">No steplings found in database</div>';
+                    }
+                } else {
+                    setStatus('steplings-status', `❌ Steplings API failed: ${response.status}`, 'error');
+                    const errorText = await response.text();
+                    setCode('steplings-status', { error: errorText });
+                }
+            } catch (error) {
+                setStatus('steplings-status', `💥 Steplings API error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDiscoveryAPI() {
+            setStatus('discovery-status', '🔄 Testing discovery API...', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/species/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerId: PLAYER_ID,
+                        magnifyingGlass: null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const species = data.species || { name: 'Unknown' };
+                    const hasNewStepling = data.stepling ? '✅ Created stepling!' : '⚠️ No stepling created';
+                    setStatus('discovery-status', `✅ Discovery works! Found ${species.name} - ${hasNewStepling}`, 'success');
+                    setCode('discovery-status', data);
+                } else {
+                    setStatus('discovery-status', `❌ Discovery failed: ${response.status}`, 'error');
+                    setCode('discovery-status', data);
+                }
+            } catch (error) {
+                setStatus('discovery-status', `💥 Discovery error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createTestStepling() {
+            setStatus('creation-status', '🔄 Creating test stepling...', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/steplings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        speciesId: 'd4a09c90-17ea-4778-85db-3b83c54654ef' // Grasshopper
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    setStatus('creation-status', '✅ Test stepling created successfully!', 'success');
+                    setCode('creation-status', data);
+                } else {
+                    const errorText = await response.text();
+                    setStatus('creation-status', `❌ Creation failed: ${response.status}`, 'error');
+                    setCode('creation-status', { error: errorText });
+                }
+            } catch (error) {
+                setStatus('creation-status', `💥 Creation error: ${error.message}`, 'error');
+            }
+        }
+
+        async function queryDatabase() {
+            setStatus('database-status', '🔄 Querying database directly...', 'info');
+            
+            // This will test multiple endpoints to understand the database state
+            try {
+                // Test species endpoint
+                const speciesResponse = await fetch(API_BASE + '/api/species/all');
+                const speciesData = await speciesResponse.json();
+                
+                appendStatus('database-status', `📋 Species in DB: ${speciesData.length || 0}`, 'info');
+                
+                // Test steplings with explicit player ID
+                const steplingsResponse = await fetch(API_BASE + `/api/steplings?playerId=${PLAYER_ID}`);
+                const steplingsData = await steplingsResponse.json();
+                
+                appendStatus('database-status', `👥 Steplings for player: ${steplingsData.data ? steplingsData.data.length : 0}`, 'info');
+                
+                setCode('database-status', {
+                    species: speciesData.slice(0, 3),
+                    steplings: steplingsData
+                });
+                
+            } catch (error) {
+                setStatus('database-status', `💥 Database query error: ${error.message}`, 'error');
+            }
+        }
+
+        async function runFullDiagnostic() {
+            setStatus('diagnostic-status', '🔄 Running full diagnostic...', 'info');
+            
+            const results = [];
+            
+            // Test 1: Backend Health
+            try {
+                const health = await fetch(API_BASE + '/health');
+                results.push(`Backend Health: ${health.ok ? '✅ OK' : '❌ FAIL'}`);
+            } catch (e) {
+                results.push('Backend Health: 💥 ERROR');
+            }
+            
+            // Test 2: Steplings API
+            try {
+                const steplings = await fetch(API_BASE + '/api/steplings');
+                const steplingsData = await steplings.json();
+                const count = steplingsData.data ? steplingsData.data.length : 0;
+                results.push(`Steplings API: ${steplings.ok ? '✅ OK' : '❌ FAIL'} (${count} steplings)`);
+            } catch (e) {
+                results.push('Steplings API: 💥 ERROR');
+            }
+            
+            // Test 3: Discovery API
+            try {
+                const discovery = await fetch(API_BASE + '/api/species/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId: PLAYER_ID, magnifyingGlass: null })
+                });
+                const discoveryData = await discovery.json();
+                const createdStepling = discoveryData.stepling ? 'Created stepling' : 'No stepling created';
+                results.push(`Discovery API: ${discovery.ok ? '✅ OK' : '❌ FAIL'} (${createdStepling})`);
+            } catch (e) {
+                results.push('Discovery API: 💥 ERROR');
+            }
+            
+            // Test 4: Species API
+            try {
+                const species = await fetch(API_BASE + '/api/species/all');
+                const speciesData = await species.json();
+                results.push(`Species API: ${species.ok ? '✅ OK' : '❌ FAIL'} (${speciesData.length || 0} species)`);
+            } catch (e) {
+                results.push('Species API: 💥 ERROR');
+            }
+            
+            const summary = results.join('<br>');
+            setStatus('diagnostic-status', summary, 'info');
+            
+            // Recommendation
+            const hasSteplings = results.some(r => r.includes('steplings)') && !r.includes('(0 steplings)'));
+            const discoveryWorks = results.some(r => r.includes('Discovery API: ✅'));
+            
+            if (!hasSteplings && discoveryWorks) {
+                appendStatus('diagnostic-status', '💡 DIAGNOSIS: Discovery works but no steplings exist. Try using "Inspect Cell" in the main game to create steplings.', 'warning');
+            } else if (!hasSteplings && !discoveryWorks) {
+                appendStatus('diagnostic-status', '💡 DIAGNOSIS: Discovery API has issues. Check backend logs.', 'error');
+            } else if (hasSteplings) {
+                appendStatus('diagnostic-status', '💡 DIAGNOSIS: Steplings exist! The issue might be in the frontend display. Check browser console.', 'success');
+            }
+        }
+
+        // Auto-run health check on load
+        window.addEventListener('load', () => {
+            setTimeout(testBackendHealth, 500);
+        });
+    </script>
+</body>
+</html>
