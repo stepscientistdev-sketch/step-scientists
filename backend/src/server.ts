@@ -548,7 +548,7 @@ app.use('/api/sync', syncRoutes);
 // app.use('/api/steplings', steplingRoutes); // Temporarily disabled due to auth issues
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (req: express.Request, res: express.Response) => {
   res.status(404).json({
     success: false,
     error: {
