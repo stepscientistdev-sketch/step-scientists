@@ -96,6 +96,63 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to inspect database state
+app.get('/debug/database', async (req, res) => {
+  try {
+    const playerId = MOBILE_PLAYER_ID;
+    
+    // Check player exists
+    const player = await database('players').where('id', playerId).first();
+    
+    // Count steplings
+    const steplingsCount = await database('steplings').where('player_id', playerId).count('* as count').first();
+    
+    // Get sample steplings with species data
+    const sampleSteplings = await database('steplings')
+      .leftJoin('species', 'steplings.species_id', 'species.id')
+      .where('steplings.player_id', playerId)
+      .select(
+        'steplings.id',
+        'steplings.level',
+        'steplings.fusion_level',
+        'steplings.species_id',
+        'species.name as species_name',
+        'species.rarity_tier as species_rarity'
+      )
+      .limit(5);
+    
+    // Count species
+    const speciesCount = await database('species').count('* as count').first();
+    
+    // Get all species
+    const allSpecies = await database('species').select('id', 'name', 'rarity_tier').limit(10);
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      database_status: 'connected',
+      player: {
+        exists: !!player,
+        id: player?.id,
+        username: player?.username
+      },
+      steplings: {
+        total_count: parseInt(steplingsCount.count),
+        sample: sampleSteplings
+      },
+      species: {
+        total_count: parseInt(speciesCount.count),
+        all: allSpecies
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Database inspection failed',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // API base endpoint
 app.get('/api', (req, res) => {
   res.json({
@@ -380,13 +437,35 @@ app.get('/api/steplings', trainingLimiter, async (req, res) => {
   try {
     const { playerId = MOBILE_PLAYER_ID } = req.query;
     
+    console.log(`🔍 [STEPLINGS API] Request for player: ${playerId}`);
+    console.log(`🔍 [STEPLINGS API] Default mobile player ID: ${MOBILE_PLAYER_ID}`);
+    
     // Use the actual stepling service
     const steplings = await steplingService.getPlayerSteplings(playerId as string);
     
-    console.log(`📋 Retrieved ${steplings.length} steplings for player ${playerId}`);
+    console.log(`📋 [STEPLINGS API] Service returned ${steplings.length} steplings for player ${playerId}`);
+    
+    if (steplings.length > 0) {
+      console.log(`📋 [STEPLINGS API] First stepling sample:`, {
+        id: steplings[0].id,
+        species_id: steplings[0].species_id,
+        level: steplings[0].level,
+        species: steplings[0].species
+      });
+    } else {
+      console.log(`⚠️ [STEPLINGS API] No steplings found - checking database directly...`);
+      
+      // Direct database check
+      const directCount = await database('steplings').where('player_id', playerId).count('* as count').first();
+      console.log(`🔍 [STEPLINGS API] Direct DB count: ${directCount.count} steplings`);
+      
+      const directSteplings = await database('steplings').where('player_id', playerId).select('*').limit(3);
+      console.log(`🔍 [STEPLINGS API] Direct DB sample:`, directSteplings.map(s => ({ id: s.id, species_id: s.species_id, level: s.level })));
+    }
+    
     res.json({ success: true, data: steplings });
   } catch (error) {
-    console.error('Error getting steplings:', error);
+    console.error('❌ [STEPLINGS API] Error getting steplings:', error);
     
     // Fallback to mock data if service fails
     const mockSteplings = [
