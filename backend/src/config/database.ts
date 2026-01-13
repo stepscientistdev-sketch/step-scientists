@@ -26,10 +26,10 @@ const config = {
   },
   migrations: {
     tableName: 'knex_migrations',
-    directory: '../migrations',
+    directory: process.env.NODE_ENV === 'production' ? './migrations' : '../migrations',
   },
   seeds: {
-    directory: '../seeds',
+    directory: process.env.NODE_ENV === 'production' ? './seeds' : '../seeds',
   },
 };
 

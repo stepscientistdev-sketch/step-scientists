@@ -4,9 +4,9 @@
   "description": "Backend API for Step Monsters game",
   "main": "src/server.ts",
   "scripts": {
-    "start": "ts-node src/server.ts",
+    "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "build": "echo 'Build skipped - using ts-node'",
+    "build": "tsc && node -e \"require('fs').cpSync('migrations', 'dist/migrations', {recursive: true})\" && node -e \"require('fs').cpSync('seeds', 'dist/seeds', {recursive: true})\"",
     "test": "jest",
     "migrate": "knex migrate:latest",
     "seed": "knex seed:run",
