@@ -13,7 +13,8 @@
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "types": ["node"]
   },
   "include": [
     "src/**/*"
