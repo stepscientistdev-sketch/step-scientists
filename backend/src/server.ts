@@ -41,7 +41,7 @@ app.use(cors({
     ? [
         'https://step-scientists.vercel.app',
         'https://step-scientists-*.vercel.app', // Preview deployments
-        process.env.CORS_ORIGIN || ''
+        process.env.CORS_ORIGIN
       ].filter(origin => origin && origin.length > 0)
     : [
         'http://localhost:3000', 
