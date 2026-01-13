@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Connection</title>
+</head>
+<body>
+    <h1>Step Scientists Debug</h1>
+    <div id="status">Testing...</div>
+    <div id="log"></div>
+    
+    <script>
+        const API_BASE = 'http://192.168.1.111:3000';
+        
+        async function test() {
+            const log = document.getElementById('log');
+            const status = document.getElementById('status');
+            
+            function addLog(message) {
+                log.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+                console.log(message);
+            }
+            
+            try {
+                addLog('Testing health endpoint...');
+                const healthResponse = await fetch(API_BASE + '/health');
+                const healthData = await healthResponse.json();
+                addLog('Health: ' + JSON.stringify(healthData));
+                
+                addLog('Testing API base...');
+                const apiResponse = await fetch(API_BASE + '/api');
+                const apiData = await apiResponse.json();
+                addLog('API: ' + JSON.stringify(apiData));
+                
+                addLog('Testing steplings...');
+                const steplingsResponse = await fetch(API_BASE + '/api/steplings');
+                const steplingsData = await steplingsResponse.json();
+                addLog('Steplings count: ' + (steplingsData.data ? steplingsData.data.length : 'error'));
+                
+                status.textContent = 'All tests passed!';
+                status.style.color = 'green';
+                
+            } catch (error) {
+                addLog('ERROR: ' + error.message);
+                status.textContent = 'Tests failed!';
+                status.style.color = 'red';
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

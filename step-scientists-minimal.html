@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Step Scientists - Minimal Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #333;
+            color: white;
+            padding: 20px;
+        }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connected { background: green; }
+        .disconnected { background: red; }
+        .connecting { background: orange; }
+        button { padding: 10px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Step Scientists - Minimal Test</h1>
+    
+    <div id="connection-status" class="status connecting">Connecting...</div>
+    <div id="log"></div>
+    
+    <button onclick="testHealth()">Test Health</button>
+    <button onclick="testAPI()">Test API</button>
+    <button onclick="testSteplings()">Test Steplings</button>
+    <button onclick="testDiscovery()">Test Discovery</button>
+    
+    <script>
+        const API_BASE = 'http://192.168.1.111:3000';
+        let isConnected = false;
+        
+        function log(message) {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logEl.innerHTML += '<div>[' + time + '] ' + message + '</div>';
+            console.log('[Step Scientists] ' + message);
+        }
+        
+        async function testConnection() {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.textContent = 'Connecting...';
+            statusEl.className = 'status connecting';
+            
+            try {
+                const response = await fetch(API_BASE + '/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusEl.textContent = '✅ Connected';
+                    statusEl.className = 'status connected';
+                    isConnected = true;
+                    log('Connected to backend!');
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (error) {
+                statusEl.textContent = '❌ Offline';
+                statusEl.className = 'status disconnected';
+                isConnected = false;
+                log('Connection failed: ' + error.message);
+            }
+        }
+        
+        async function testHealth() {
+            try {
+                const response = await fetch(API_BASE + '/health');
+                const data = await response.json();
+                log('Health: ' + JSON.stringify(data));
+            } catch (error) {
+                log('Health error: ' + error.message);
+            }
+        }
+        
+        async function testAPI() {
+            try {
+                const response = await fetch(API_BASE + '/api');
+                const data = await response.json();
+                log('API: ' + JSON.stringify(data));
+            } catch (error) {
+                log('API error: ' + error.message);
+            }
+        }
+        
+        async function testSteplings() {
+            try {
+                const response = await fetch(API_BASE + '/api/steplings');
+                const data = await response.json();
+                log('Steplings: ' + (data.success ? data.data.length + ' found' : 'failed'));
+            } catch (error) {
+                log('Steplings error: ' + error.message);
+            }
+        }
+        
+        async function testDiscovery() {
+            try {
+                const response = await fetch(API_BASE + '/api/species/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId: 'mobile_player' })
+                });
+                const data = await response.json();
+                log('Discovery: ' + (data.success ? data.species.name : 'failed'));
+            } catch (error) {
+                log('Discovery error: ' + error.message);
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            log('Initializing minimal test...');
+            await testConnection();
+        });
+    </script>
+</body>
+</html>

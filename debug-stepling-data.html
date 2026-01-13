@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Stepling Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .stepling-debug { 
+            border: 1px solid #ccc; 
+            padding: 15px; 
+            margin: 10px 0; 
+            background: #f9f9f9;
+        }
+        .missing-field { color: red; font-weight: bold; }
+        .has-field { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Stepling Data Debug</h1>
+    <p>This will show the raw data for your steplings to see if the hasSuboptimalFusion field is present.</p>
+    
+    <button onclick="loadSteplingData()">Load Stepling Data</button>
+    <button onclick="fixMissingFields()">Fix Missing Fields</button>
+    
+    <div id="debug-output"></div>
+
+    <script>
+        async function loadSteplingData() {
+            const output = document.getElementById('debug-output');
+            
+            try {
+                // Try to get steplings from localStorage (simulating the app's storage)
+                const steplingsStr = localStorage.getItem('player_steplings');
+                
+                if (!steplingsStr) {
+                    output.innerHTML = '<p>No steplings found in localStorage. Make sure you have some steplings in your game first.</p>';
+                    return;
+                }
+                
+                const steplings = JSON.parse(steplingsStr);
+                
+                output.innerHTML = '<h2>Found Steplings:</h2>';
+                
+                steplings.forEach((stepling, index) => {
+                    const hasField = stepling.hasOwnProperty('hasSuboptimalFusion');
+                    const fieldValue = stepling.hasSuboptimalFusion;
+                    
+                    const div = document.createElement('div');
+                    div.className = 'stepling-debug';
+                    div.innerHTML = `
+                        <h3>Stepling ${index + 1}: ${stepling.speciesId || 'Unknown'}</h3>
+                        <p><strong>ID:</strong> ${stepling.id}</p>
+                        <p><strong>Level:</strong> ${stepling.level} / Fusion Level: ${stepling.fusionLevel}</p>
+                        <p><strong>hasSuboptimalFusion field:</strong> 
+                            <span class="${hasField ? 'has-field' : 'missing-field'}">
+                                ${hasField ? `Present (${fieldValue})` : 'MISSING'}
+                            </span>
+                        </p>
+                        <details>
+                            <summary>Raw JSON Data</summary>
+                            <pre>${JSON.stringify(stepling, null, 2)}</pre>
+                        </details>
+                    `;
+                    output.appendChild(div);
+                });
+                
+            } catch (error) {
+                output.innerHTML = `<p style="color: red;">Error loading stepling data: ${error.message}</p>`;
+            }
+        }
+        
+        async function fixMissingFields() {
+            try {
+                const steplingsStr = localStorage.getItem('player_steplings');
+                if (!steplingsStr) {
+                    alert('No steplings found to fix.');
+                    return;
+                }
+                
+                const steplings = JSON.parse(steplingsStr);
+                let fixedCount = 0;
+                
+                steplings.forEach(stepling => {
+                    if (!stepling.hasOwnProperty('hasSuboptimalFusion')) {
+                        stepling.hasSuboptimalFusion = false; // Default to false for existing steplings
+                        fixedCount++;
+                    }
+                });
+                
+                if (fixedCount > 0) {
+                    localStorage.setItem('player_steplings', JSON.stringify(steplings));
+                    alert(`Fixed ${fixedCount} steplings. Reload your game to see the changes.`);
+                    loadSteplingData(); // Refresh the display
+                } else {
+                    alert('All steplings already have the hasSuboptimalFusion field.');
+                }
+                
+            } catch (error) {
+                alert(`Error fixing steplings: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

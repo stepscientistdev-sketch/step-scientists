@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Step Scientists - Complete</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        .app { max-width: 400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .connection-status {
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .connected { background: rgba(76, 175, 80, 0.3); }
+        .disconnected { background: rgba(244, 67, 54, 0.3); }
+        .connecting { background: rgba(255, 152, 0, 0.3); }
+        .google-fit-status {
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .step-display {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .step-count { font-size: 48px; font-weight: bold; margin-bottom: 10px; }
+        .mode-display {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .resources {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .resource {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .resource-value { font-size: 24px; font-weight: bold; }
+        .resource-label { font-size: 12px; opacity: 0.8; }
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.95);
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: rgba(76, 175, 80, 0.8); }
+        .btn-secondary { background: rgba(33, 150, 243, 0.8); }
+        .btn-warning { background: rgba(255, 193, 7, 0.8); }
+        .section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .card:active { background: rgba(255,255,255,0.2); }
+        .card.selected {
+            background: rgba(76, 175, 80, 0.4);
+            border: 2px solid rgba(76, 175, 80, 0.8);
+        }
+        .card.max-level {
+            opacity: 0.6;
+            border: 1px solid rgba(255, 193, 7, 0.5);
+        }
+        .card.suboptimal {
+            border-left: 4px solid rgba(255, 87, 34, 0.8);
+        }
+        .suboptimal-indicator {
+            font-size: 10px;
+            color: #ff5722;
+            font-weight: bold;
+        }
+        .fusion-slot {
+            width: 80px;
+            height: 80px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: rgba(255,255,255,0.1);
+        }
+        .fusion-slot.filled {
+            border: 2px solid rgba(76, 175, 80, 0.8);
+            background: rgba(76, 175, 80, 0.2);
+        }
+        .fusion-slot.active {
+            border: 2px solid rgba(33, 150, 243, 0.8);
+            background: rgba(33, 150, 243, 0.2);
+        }
+        .fusion-result-slot {
+            border-color: rgba(255, 193, 7, 0.8);
+            background: rgba(255, 193, 7, 0.1);
+            cursor: default;
+        }
+        .fusion-placeholder {
+            font-size: 10px;
+            text-align: center;
+            opacity: 0.7;
+        }
+        .fusion-stepling {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .fusion-stepling .emoji {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+        .fusion-stepling .name {
+            font-size: 8px;
+        }
+        .emoji { font-size: 24px; margin-bottom: 5px; }
+        .name { font-size: 12px; }
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: monospace;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>🧪 Step Scientists</h1>
+            <div id="connection-status" class="connection-status connecting">Connecting...</div>
+            <div id="google-fit-status" class="google-fit-status disconnected" onclick="connectGoogleFit()">
+                🏥 Tap to connect Google Fit
+            </div>
+        </div>
+        
+        <div class="step-display">
+            <div id="step-count" class="step-count">0</div>
+            <div>Steps Today</div>
+        </div>
+        
+        <div class="mode-display">
+            <div id="mode-title">🔍 Discovery Mode</div>
+            <div id="mode-desc">1000 steps = 1 cell</div>
+        </div>
+        
+        <div class="resources">
+            <div class="resource">
+                <div id="cells" class="resource-value">0</div>
+                <div class="resource-label">Cells</div>
+            </div>
+            <div class="resource">
+                <div id="exp" class="resource-value">0</div>
+                <div class="resource-label">Experience</div>
+            </div>
+            <div class="resource">
+                <div id="exp-bank" class="resource-value">0</div>
+                <div class="resource-label">XP Bank</div>
+            </div>
+            <div class="resource">
+                <div id="glass" class="resource-value">0</div>
+                <div class="resource-label">🔍 Glass</div>
+                <button onclick="showGlassInventory()" style="font-size: 10px; padding: 2px 6px; margin-top: 2px; background: rgba(255,255,255,0.2); border: none; border-radius: 3px; color: white;">View</button>
+            </div>
+        </div>
+        
+        <!-- Milestone Progress Display -->
+        <div id="milestone-progress" class="section" style="background: rgba(255,255,255,0.15); border-radius: 15px; padding: 15px; margin-bottom: 20px;">
+            <h3 style="margin-bottom: 15px; text-align: center; font-size: 16px;">🔍 Magnifying Glass Progress</h3>
+            <div id="milestone-bars">
+                <!-- Progress bars will be populated here -->
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="addSteps()">+100 Steps</button>
+            <button class="btn btn-secondary" onclick="switchMode()">Switch Mode</button>
+            <button class="btn" onclick="inspectCell()" id="inspect-btn">Inspect Cell</button>
+            <button class="btn" onclick="toggleMagnifyingGlass()" id="glass-btn">Use 🔍 Glass</button>
+            <button class="btn" onclick="viewSteplings()">View Steplings</button>
+            <button class="btn btn-warning" onclick="manageTrainingRoster()" id="training-btn">Training Roster</button>
+            <button class="btn btn-secondary" onclick="manageFusion()" id="fusion-btn">Fusion Lab</button>
+            <button class="btn" onclick="syncSteps()">Sync Steps</button>
+        </div>
+        
+        <div id="species-section" class="section">
+            <h3>Species Collection</h3>
+            <div id="species-grid" class="grid">
+                <div class="card">Loading...</div>
+            </div>
+        </div>
+        
+        <div id="steplings-section" class="section" style="display: none;">
+            <h3>My Steplings</h3>
+            <div id="steplings-grid" class="grid">
+                <div class="card">Loading...</div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn" onclick="hideSteplings()">Back</button>
+                <button class="btn btn-secondary" onclick="loadSteplings()">Refresh</button>
+                <button class="btn btn-warning" onclick="debugSteplings()">Debug</button>
+            </div>
+        </div>
+        
+        <div id="training-roster-section" class="section" style="display: none;">
+            <h3>Training Roster</h3>
+            <p style="font-size: 14px; opacity: 0.8; margin-bottom: 15px;">
+                Select steplings to receive experience points in Training Mode (Max 10, ordered 1-10)
+            </p>
+            <div id="training-roster-grid" class="grid">
+                <div class="card">Loading...</div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn" onclick="hideTrainingRoster()">Back</button>
+                <button class="btn btn-primary" onclick="saveTrainingRoster()">Save Roster</button>
+                <button class="btn btn-warning" onclick="applyBankedExperience()" id="apply-exp-btn" style="display: none;">Apply Banked XP</button>
+            </div>
+        </div>
+        
+        <div id="fusion-section" class="section" style="display: none;">
+            <h3>🔬 Fusion Lab</h3>
+            <p style="font-size: 14px; opacity: 0.8; margin-bottom: 15px;">
+                Select 2 steplings of the same species and fusion level to create a stronger stepling
+            </p>
+            <div id="fusion-selection" style="margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 10px;">
+                    <div id="fusion-slot-1" class="fusion-slot" onclick="selectFusionSlot(1)">
+                        <div class="fusion-placeholder">Select Stepling 1</div>
+                    </div>
+                    <div style="font-size: 24px; align-self: center;">+</div>
+                    <div id="fusion-slot-2" class="fusion-slot" onclick="selectFusionSlot(2)">
+                        <div class="fusion-placeholder">Select Stepling 2</div>
+                    </div>
+                    <div style="font-size: 24px; align-self: center;">=</div>
+                    <div id="fusion-result" class="fusion-slot fusion-result-slot">
+                        <div class="fusion-placeholder">Result</div>
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <button class="btn btn-primary" onclick="performFusion()" id="fusion-execute-btn" disabled>Fuse Steplings</button>
+                </div>
+            </div>
+            <div id="fusion-steplings-grid" class="grid">
+                <div class="card">Loading...</div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn" onclick="hideFusion()">Back</button>
+                <button class="btn btn-secondary" onclick="loadFusionSteplings()">Refresh</button>
+            </div>
+        </div>
+        
+        <div id="stepling-details-section" class="section" style="display: none;">
+            <h3 id="stepling-details-title">Stepling Details</h3>
+            <div id="stepling-details-content" style="text-align: center;">
+                <div id="stepling-details-main" style="margin-bottom: 20px;">
+                    <div id="stepling-emoji" style="font-size: 48px; margin-bottom: 10px;">🦗</div>
+                    <div id="stepling-name" style="font-size: 20px; font-weight: bold; margin-bottom: 5px;">Grasshopper</div>
+                    <div id="stepling-level-info" style="font-size: 14px; opacity: 0.8; margin-bottom: 15px;">Level 1/10 • Fusion 1</div>
+                </div>
+                
+                <div id="stepling-stats" style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">Stats</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
+                            <div style="font-size: 12px; opacity: 0.7;">Health</div>
+                            <div id="stat-health" style="font-size: 18px; font-weight: bold;">100</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
+                            <div style="font-size: 12px; opacity: 0.7;">Attack</div>
+                            <div id="stat-attack" style="font-size: 18px; font-weight: bold;">50</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
+                            <div style="font-size: 12px; opacity: 0.7;">Defense</div>
+                            <div id="stat-defense" style="font-size: 18px; font-weight: bold;">40</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
+                            <div style="font-size: 12px; opacity: 0.7;">Special</div>
+                            <div id="stat-special" style="font-size: 18px; font-weight: bold;">30</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="stepling-info" style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">Info</h4>
+                    <div style="text-align: left; font-size: 14px;">
+                        <div style="margin-bottom: 5px;"><strong>Species:</strong> <span id="info-species">Grasshopper</span></div>
+                        <div style="margin-bottom: 5px;"><strong>Rarity:</strong> <span id="info-rarity">Common</span></div>
+                        <div style="margin-bottom: 5px;"><strong>Max Level:</strong> <span id="info-max-level">10</span></div>
+                        <div style="margin-bottom: 5px;"><strong>Next Level:</strong> <span id="info-next-level">10 EXP needed</span></div>
+                        <div style="margin-bottom: 5px;"><strong>Created:</strong> <span id="info-created">Just now</span></div>
+                        <div><strong>Release Value:</strong> <span id="info-release-value">0 EXP</span></div>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">Actions</h4>
+                    <button class="btn btn-danger" onclick="confirmReleaseStepling()" id="release-btn" style="width: 100%; background: #dc3545;">
+                        🕊️ Release Stepling
+                    </button>
+                    <div style="font-size: 12px; opacity: 0.8; margin-top: 8px; text-align: center;">
+                        Permanently release this stepling for XP bank points
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button class="btn" onclick="hideSteplingDetails()">Back</button>
+            </div>
+        </div>
+        
+        <!-- Magnifying Glass Inventory -->
+        <div id="glass-inventory-section" class="section" style="display: none;">
+            <h3>🔍 Magnifying Glass Inventory</h3>
+            <p style="font-size: 14px; opacity: 0.8; margin-bottom: 15px;">
+                Select which magnifying glass to use for your next discovery
+            </p>
+            <div id="glass-inventory-grid" class="grid">
+                <!-- Glass inventory will be populated here -->
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn" onclick="hideGlassInventory()">Back</button>
+            </div>
+        </div>
+        
+        <div id="log" class="log">Step Scientists loading...</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

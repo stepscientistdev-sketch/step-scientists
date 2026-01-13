@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Imperfect Flag</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .stepling { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px;
+        }
+        .imperfect { 
+            background-color: #fff3e0; 
+            border-left: 3px solid #ff9800;
+        }
+        .perfect { 
+            background-color: #e8f5e8; 
+            border-left: 3px solid #4caf50;
+        }
+        .warning { 
+            background-color: #ffebee; 
+            border: 1px solid #f44336;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        button { 
+            padding: 10px 15px; 
+            margin: 5px; 
+            border: none; 
+            border-radius: 3px; 
+            cursor: pointer;
+        }
+        .btn-primary { background-color: #2196f3; color: white; }
+        .btn-warning { background-color: #ff9800; color: white; }
+        .btn-danger { background-color: #f44336; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Step Monsters - Imperfect Flag Test</h1>
+    
+    <div id="status">Loading...</div>
+    
+    <h2>Your Steplings</h2>
+    <div id="steplings-list"></div>
+    
+    <h2>Test Fusion</h2>
+    <div id="fusion-controls">
+        <p>Select two steplings to test fusion:</p>
+        <select id="stepling1-select">
+            <option value="">Select first stepling...</option>
+        </select>
+        <select id="stepling2-select">
+            <option value="">Select second stepling...</option>
+        </select>
+        <br><br>
+        <button class="btn-primary" onclick="testFusion()">Test Fusion</button>
+        <button class="btn-warning" onclick="testFusion(true)">Force Fusion (Skip Warning)</button>
+    </div>
+    
+    <div id="fusion-result"></div>
+
+    <script>
+        // Mock data for testing
+        let steplings = [
+            {
+                id: 'turtle1',
+                playerId: 'player1',
+                speciesId: 'Pebble Turtle',
+                level: 15,
+                fusionLevel: 2,
+                currentStats: { health: 120, attack: 60, defense: 80, special: 40 },
+                hasSuboptimalFusion: true, // This turtle was created from non-max fusion
+                createdAt: new Date('2024-01-01'),
+                updatedAt: new Date('2024-01-15')
+            },
+            {
+                id: 'turtle2',
+                playerId: 'player1',
+                speciesId: 'Pebble Turtle',
+                level: 20,
+                fusionLevel: 2,
+                currentStats: { health: 140, attack: 70, defense: 90, special: 50 },
+                hasSuboptimalFusion: false, // This turtle is perfect
+                createdAt: new Date('2024-01-02'),
+                updatedAt: new Date('2024-01-16')
+            },
+            {
+                id: 'turtle3',
+                playerId: 'player1',
+                speciesId: 'Pebble Turtle',
+                level: 18,
+                fusionLevel: 2,
+                currentStats: { health: 130, attack: 65, defense: 85, special: 45 },
+                // Missing hasSuboptimalFusion field (simulates old data)
+                createdAt: new Date('2024-01-03'),
+                updatedAt: new Date('2024-01-17')
+            }
+        ];
+
+        function displaySteplings() {
+            const container = document.getElementById('steplings-list');
+            const select1 = document.getElementById('stepling1-select');
+            const select2 = document.getElementById('stepling2-select');
+            
+            container.innerHTML = '';
+            select1.innerHTML = '<option value="">Select first stepling...</option>';
+            select2.innerHTML = '<option value="">Select second stepling...</option>';
+            
+            steplings.forEach(stepling => {
+                // Handle missing hasSuboptimalFusion field (default to false)
+                const hasSuboptimalFusion = stepling.hasSuboptimalFusion || false;
+                const maxLevel = stepling.fusionLevel * 10;
+                const isMaxLevel = stepling.level >= maxLevel;
+                
+                const div = document.createElement('div');
+                div.className = `stepling ${hasSuboptimalFusion ? 'imperfect' : 'perfect'}`;
+                div.innerHTML = `
+                    <h3>${stepling.speciesId} ${hasSuboptimalFusion ? '⚠️ IMPERFECT' : '✅ PERFECT'}</h3>
+                    <p><strong>Level:</strong> ${stepling.level}/${maxLevel} ${isMaxLevel ? '(MAX)' : ''}</p>
+                    <p><strong>Fusion Level:</strong> ${stepling.fusionLevel}</p>
+                    <p><strong>Stats:</strong> HP:${stepling.currentStats.health} ATK:${stepling.currentStats.attack} DEF:${stepling.currentStats.defense} SPL:${stepling.currentStats.special}</p>
+                    <p><strong>ID:</strong> ${stepling.id}</p>
+                    ${hasSuboptimalFusion ? '<p style="color: #ff9800;"><em>⚠️ This stepling was created from a fusion involving non-maxed steplings.</em></p>' : ''}
+                `;
+                container.appendChild(div);
+                
+                // Add to select options
+                const option1 = document.createElement('option');
+                option1.value = stepling.id;
+                option1.textContent = `${stepling.speciesId} (L${stepling.level}/F${stepling.fusionLevel}) ${hasSuboptimalFusion ? '⚠️' : '✅'}`;
+                select1.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = stepling.id;
+                option2.textContent = `${stepling.speciesId} (L${stepling.level}/F${stepling.fusionLevel}) ${hasSuboptimalFusion ? '⚠️' : '✅'}`;
+                select2.appendChild(option2);
+            });
+        }
+
+        function testFusion(forceNonMax = false) {
+            const stepling1Id = document.getElementById('stepling1-select').value;
+            const stepling2Id = document.getElementById('stepling2-select').value;
+            const resultDiv = document.getElementById('fusion-result');
+            
+            if (!stepling1Id || !stepling2Id) {
+                resultDiv.innerHTML = '<div class="warning">Please select two steplings to fuse.</div>';
+                return;
+            }
+            
+            if (stepling1Id === stepling2Id) {
+                resultDiv.innerHTML = '<div class="warning">Cannot fuse a stepling with itself.</div>';
+                return;
+            }
+            
+            const stepling1 = steplings.find(s => s.id === stepling1Id);
+            const stepling2 = steplings.find(s => s.id === stepling2Id);
+            
+            if (!stepling1 || !stepling2) {
+                resultDiv.innerHTML = '<div class="warning">Selected steplings not found.</div>';
+                return;
+            }
+            
+            // Check fusion requirements
+            if (stepling1.speciesId !== stepling2.speciesId) {
+                resultDiv.innerHTML = '<div class="warning">Steplings must be of the same species to fuse.</div>';
+                return;
+            }
+            
+            if (stepling1.fusionLevel !== stepling2.fusionLevel) {
+                resultDiv.innerHTML = '<div class="warning">Steplings must be at the same fusion level to fuse.</div>';
+                return;
+            }
+            
+            // Check if either stepling is not at max level
+            const maxLevel1 = stepling1.fusionLevel * 10;
+            const maxLevel2 = stepling2.fusionLevel * 10;
+            const isNonMaxFusion = stepling1.level < maxLevel1 || stepling2.level < maxLevel2;
+            
+            if (isNonMaxFusion && !forceNonMax) {
+                resultDiv.innerHTML = `
+                    <div class="warning">
+                        <h3>⚠️ Non-Max Fusion Warning</h3>
+                        <p>Warning: You are about to fuse steplings that are not at maximum level!</p>
+                        <p><strong>Current stepling:</strong> Level ${stepling1.level}/${maxLevel1}</p>
+                        <p><strong>Fusion partner:</strong> Level ${stepling2.level}/${maxLevel2}</p>
+                        <p>Fusing non-maxed steplings will permanently mark the resulting stepling as "imperfect" and may result in lower stats.</p>
+                        <p>Are you sure you want to proceed?</p>
+                        <button class="btn-danger" onclick="testFusion(true)">Fuse Anyway</button>
+                        <button class="btn-primary" onclick="document.getElementById('fusion-result').innerHTML = ''">Cancel</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Simulate fusion
+            const hasSuboptimalFusion1 = stepling1.hasSuboptimalFusion || false;
+            const hasSuboptimalFusion2 = stepling2.hasSuboptimalFusion || false;
+            const newHasSuboptimalFusion = isNonMaxFusion || hasSuboptimalFusion1 || hasSuboptimalFusion2;
+            
+            const newStepling = {
+                id: 'new_' + Date.now(),
+                playerId: stepling1.playerId,
+                speciesId: stepling1.speciesId,
+                level: 1,
+                fusionLevel: stepling1.fusionLevel + 1,
+                currentStats: {
+                    health: Math.round((stepling1.currentStats.health + stepling2.currentStats.health) / 2 * 1.1),
+                    attack: Math.round((stepling1.currentStats.attack + stepling2.currentStats.attack) / 2 * 1.1),
+                    defense: Math.round((stepling1.currentStats.defense + stepling2.currentStats.defense) / 2 * 1.1),
+                    special: Math.round((stepling1.currentStats.special + stepling2.currentStats.special) / 2 * 1.1)
+                },
+                hasSuboptimalFusion: newHasSuboptimalFusion,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            
+            // Remove old steplings and add new one
+            steplings = steplings.filter(s => s.id !== stepling1Id && s.id !== stepling2Id);
+            steplings.push(newStepling);
+            
+            resultDiv.innerHTML = `
+                <div style="background-color: #e8f5e8; border: 1px solid #4caf50; padding: 10px; border-radius: 5px;">
+                    <h3>✅ Fusion Success!</h3>
+                    <p>Created a new ${newStepling.speciesId} at fusion level ${newStepling.fusionLevel}!</p>
+                    <p><strong>Imperfect Status:</strong> ${newHasSuboptimalFusion ? '⚠️ IMPERFECT' : '✅ PERFECT'}</p>
+                    <p><strong>Stats:</strong> HP:${newStepling.currentStats.health} ATK:${newStepling.currentStats.attack} DEF:${newStepling.currentStats.defense} SPL:${newStepling.currentStats.special}</p>
+                </div>
+            `;
+            
+            // Refresh display
+            displaySteplings();
+        }
+
+        // Initialize
+        document.getElementById('status').textContent = 'Ready! Test the imperfect flag system below.';
+        displaySteplings();
+    </script>
+</body>
+</html>

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Step Scientists - Full System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .app { max-width: 400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        
+        .connection-status {
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .connected { background: rgba(76, 175, 80, 0.3); }
+        .disconnected { background: rgba(244, 67, 54, 0.3); }
+        .connecting { background: rgba(255, 152, 0, 0.3); }
+        
+        .step-display {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-count { font-size: 48px; font-weight: bold; margin-bottom: 10px; }
+        
+        .mode-display {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .resources {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .resource {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .resource-value { font-size: 24px; font-weight: bold; }
+        .resource-label { font-size: 12px; opacity: 0.8; }
+        
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.95);
+        }
+        
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: rgba(76, 175, 80, 0.8); }
+        .btn-secondary { background: rgba(33, 150, 243, 0.8); }
+        .btn-warning { background: rgba(255, 193, 7, 0.8); }
+        
+        .section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+        
+        .card:active { background: rgba(255,255,255,0.2); }
+        
+        .emoji { font-size: 24px; margin-bottom: 5px; }
+        .name { font-size: 12px; }
+        
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: monospace;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>🧪 Step Scientists</h1>
+            <div id="connection-status" class="connection-status connecting">Connecting...</div>
+        </div>
+        
+        <div class="step-display">
+            <div id="step-count" class="step-count">0</div>
+            <div>Steps Today</div>
+        </div>
+        
+        <div class="mode-display">
+            <div id="mode-title">🔍 Discovery Mode</div>
+            <div id="mode-desc">1000 steps = 1 cell</div>
+        </div>
+        
+        <div class="resources">
+            <div class="resource">
+                <div id="cells" class="resource-value">0</div>
+                <div class="resource-label">Cells</div>
+            </div>
+            <div class="resource">
+                <div id="exp" class="resource-value">0</div>
+                <div class="resource-label">Experience</div>
+            </div>
+            <div class="resource">
+                <div id="glass" class="resource-value">0</div>
+                <div class="resource-label">🔍 Glass</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="addSteps()">+100 Steps</button>
+            <button class="btn btn-secondary" onclick="switchMode()">Switch Mode</button>
+            <button class="btn" onclick="inspectCell()" id="inspect-btn">Inspect Cell</button>
+            <button class="btn" onclick="toggleMagnifyingGlass()" id="glass-btn">Use 🔍 Glass</button>
+            <button class="btn" onclick="viewSteplings()">View Steplings</button>
+            <button class="btn" onclick="loadSpecies()">Refresh</button>
+        </div>
+        
+        <div id="species-section" class="section">
+            <h3>Species Collection</h3>
+            <div id="species-grid" class="grid">
+                <div class="card">Loading...</div>
+            </div>
+        </div>
+        
+        <div id="steplings-section" class="section" style="display: none;">
+            <h3>My Steplings</h3>
+            <div id="steplings-grid" class="grid">
+                <div class="card">Loading...</div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn" onclick="hideSteplings()">Back</button>
+                <button class="btn btn-secondary" onclick="loadSteplings()">Refresh</button>
+            </div>
+        </div>
+        
+        <div id="log" class="log">Step Scientists loading...</div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.111:3000';
+        
+        var game = {
+            steps: 5000,
+            mode: 'discovery',
+            cells: 5,
+            experience: 0,
+            magnifyingGlass: 2,
+            discoveredSpecies: [],
+            milestonesReached: [5000] // Already reached 5000 milestone
+        };
+        
+        var allSpecies = [];
+        var playerSteplings = [];
+        var isConnected = false;
+        var useMagnifyingGlass = false;
+        
+        // Initialize
+        async function init() {
+            log('Initializing Step Scientists...');
+            await testConnection();
+            loadGame();
+            await loadSpecies();
+            updateDisplay();
+        }
+        
+        // Test connection
+        async function testConnection() {
+            var statusEl = document.getElementById('connection-status');
+            statusEl.textContent = 'Connecting...';
+            statusEl.className = 'connection-status connecting';
+            
+            try {
+                var response = await fetch(API_BASE + '/health');
+                var data = await response.json();
+                
+                if (response.ok) {
+                    statusEl.textContent = '✅ Connected';
+                    statusEl.className = 'connection-status connected';
+                    isConnected = true;
+                    log('Connected to backend!');
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (error) {
+                statusEl.textContent = '❌ Offline';
+                statusEl.className = 'connection-status disconnected';
+                isConnected = false;
+                log('Offline mode');
+            }
+        }
+        
+        // Add steps
+        function addSteps() {
+            var oldSteps = game.steps;
+            game.steps += 100;
+            
+            if (game.mode === 'discovery') {
+                var oldCells = Math.floor(oldSteps / 1000);
+                var newCells = Math.floor(game.steps / 1000);
+                var cellsToAdd = newCells - oldCells;
+                
+                if (cellsToAdd > 0) {
+                    game.cells += cellsToAdd;
+                    log('Earned ' + cellsToAdd + ' cells!');
+                } else {
+                    var needed = 1000 - (game.steps % 1000);
+                    log(needed + ' more steps for next cell');
+                }
+            } else {
+                var oldExp = Math.floor(oldSteps / 10);
+                var newExp = Math.floor(game.steps / 10);
+                var expToAdd = newExp - oldExp;
+                
+                if (expToAdd > 0) {
+                    game.experience += expToAdd;
+                    log('Earned ' + expToAdd + ' experience!');
+                }
+            }
+            
+            checkMilestones();
+            updateDisplay();
+            saveGame();
+        }
+        
+        // Switch mode
+        function switchMode() {
+            console.log('switchMode called, current mode:', game.mode);
+            game.mode = game.mode === 'discovery' ? 'training' : 'discovery';
+            console.log('new mode:', game.mode);
+            updateDisplay();
+            log('Switched to ' + game.mode + ' mode');
+            saveGame();
+        }
+        
+        // Toggle magnifying glass
+        function toggleMagnifyingGlass() {
+            console.log('toggleMagnifyingGlass called, current glass count:', game.magnifyingGlass);
+            if (game.magnifyingGlass < 1) {
+                log('No magnifying glasses available!');
+                return;
+            }
+            
+            useMagnifyingGlass = !useMagnifyingGlass;
+            var glassBtn = document.getElementById('glass-btn');
+            console.log('useMagnifyingGlass is now:', useMagnifyingGlass);
+            
+            if (useMagnifyingGlass) {
+                glassBtn.innerHTML = '🔍 Glass ON';
+                glassBtn.className = 'btn btn-warning';
+                log('Magnifying glass ready! Will be used on next discovery.');
+            } else {
+                glassBtn.innerHTML = 'Use 🔍 Glass (' + game.magnifyingGlass + ')';
+                glassBtn.className = 'btn';
+                log('Magnifying glass deactivated.');
+            }
+            updateDisplay();
+        }
+        
+        // Inspect cell
+        async function inspectCell() {
+            if (game.cells < 1) {
+                log('Need at least 1 cell!');
+                return;
+            }
+            
+            if (!isConnected) {
+                log('Need backend connection!');
+                return;
+            }
+            
+            game.cells--;
+            
+            var magnifyingGlassData = null;
+            if (useMagnifyingGlass && game.magnifyingGlass > 0) {
+                magnifyingGlassData = { tier: 'common' };
+                game.magnifyingGlass--;
+                useMagnifyingGlass = false;
+                var glassBtn = document.getElementById('glass-btn');
+                glassBtn.innerHTML = 'Use 🔍 Glass';
+                glassBtn.className = 'btn';
+                log('Used magnifying glass!');
+            }
+            
+            updateDisplay();
+            
+            try {
+                var response = await fetch(API_BASE + '/api/species/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerId: 'mobile_player',
+                        magnifyingGlass: magnifyingGlassData
+                    })
+                });
+                
+                if (response.ok) {
+                    var result = await response.json();
+                    
+                    if (result.success) {
+                        var species = result.species;
+                        
+                        if (result.isNewDiscovery) {
+                            game.discoveredSpecies.push(species.id);
+                            log('🎉 NEW! ' + species.rarity.toUpperCase() + ' ' + species.name + ' ' + species.emoji);
+                        } else {
+                            log('Found ' + species.name + ' ' + species.emoji + ' (known)');
+                        }
+                        
+                        updateSpeciesGrid();
+                        saveGame();
+                    } else {
+                        log('Discovery failed: ' + result.error);
+                    }
+                } else {
+                    throw new Error('Request failed');
+                }
+            } catch (error) {
+                log('Discovery error: ' + error.message);
+                game.cells++; // Refund
+                if (magnifyingGlassData) game.magnifyingGlass++; // Refund glass
+                updateDisplay();
+            }
+        }
+        
+        // View steplings
+        function viewSteplings() {
+            console.log('viewSteplings called');
+            var speciesSection = document.getElementById('species-section');
+            var steplingsSection = document.getElementById('steplings-section');
+            console.log('species section:', speciesSection);
+            console.log('steplings section:', steplingsSection);
+            
+            if (speciesSection) speciesSection.style.display = 'none';
+            if (steplingsSection) steplingsSection.style.display = 'block';
+            
+            log('Viewing steplings...');
+            loadSteplings();
+        }
+        
+        // Hide steplings
+        function hideSteplings() {
+            document.getElementById('steplings-section').style.display = 'none';
+            document.getElementById('species-section').style.display = 'block';
+        }
+        
+        // Load species
+        async function loadSpecies() {
+            if (!isConnected) return;
+            
+            try {
+                var response = await fetch(API_BASE + '/api/species/all');
+                if (response.ok) {
+                    allSpecies = await response.json();
+                    log('Loaded ' + allSpecies.length + ' species');
+                    updateSpeciesGrid();
+                }
+            } catch (error) {
+                log('Species load error: ' + error.message);
+            }
+        }
+        
+        // Load steplings
+        async function loadSteplings() {
+            if (!isConnected) return;
+            
+            try {
+                var response = await fetch(API_BASE + '/api/steplings');
+                if (response.ok) {
+                    var result = await response.json();
+                    playerSteplings = result.data || [];
+                    log('Loaded ' + playerSteplings.length + ' steplings');
+                    updateSteplingsGrid();
+                }
+            } catch (error) {
+                log('Steplings load error: ' + error.message);
+            }
+        }
+        
+        // Check milestones
+        function checkMilestones() {
+            var milestones = [5000, 10000, 50000, 100000];
+            
+            for (var i = 0; i < milestones.length; i++) {
+                var milestone = milestones[i];
+                // Check if we've reached this milestone and haven't already been awarded it
+                if (game.steps >= milestone && game.milestonesReached.indexOf(milestone) === -1) {
+                    game.magnifyingGlass++;
+                    game.milestonesReached.push(milestone);
+                    log('🎉 ' + milestone + ' steps! Earned magnifying glass! Total: ' + game.magnifyingGlass);
+                }
+            }
+        }
+        
+        // Update display
+        function updateDisplay() {
+            document.getElementById('step-count').innerHTML = game.steps;
+            document.getElementById('cells').innerHTML = game.cells;
+            document.getElementById('exp').innerHTML = game.experience;
+            document.getElementById('glass').innerHTML = game.magnifyingGlass;
+            
+            if (game.mode === 'discovery') {
+                document.getElementById('mode-title').innerHTML = '🔍 Discovery Mode';
+                document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell';
+            } else {
+                document.getElementById('mode-title').innerHTML = '💪 Training Mode';
+                document.getElementById('mode-desc').innerHTML = '10 steps = 1 experience';
+            }
+            
+            var inspectBtn = document.getElementById('inspect-btn');
+            if (game.cells >= 1 && isConnected) {
+                inspectBtn.innerHTML = 'Inspect Cell (' + game.cells + ')';
+                inspectBtn.disabled = false;
+            } else {
+                inspectBtn.innerHTML = game.cells < 1 ? 'Need 1 Cell' : 'Need Backend';
+                inspectBtn.disabled = true;
+            }
+            
+            var glassBtn = document.getElementById('glass-btn');
+            if (game.magnifyingGlass < 1) {
+                glassBtn.disabled = true;
+                glassBtn.innerHTML = 'No Glass';
+            } else {
+                glassBtn.disabled = false;
+                if (useMagnifyingGlass) {
+                    glassBtn.innerHTML = '🔍 Glass ON';
+                    glassBtn.className = 'btn btn-warning';
+                } else {
+                    glassBtn.innerHTML = 'Use 🔍 Glass (' + game.magnifyingGlass + ')';
+                    glassBtn.className = 'btn';
+                }
+            }
+        }
+        
+        // Update species grid
+        function updateSpeciesGrid() {
+            var grid = document.getElementById('species-grid');
+            var html = '';
+            
+            for (var i = 0; i < allSpecies.length; i++) {
+                var s = allSpecies[i];
+                var discovered = s.discovered || game.discoveredSpecies.indexOf(s.id) !== -1;
+                html += '<div class="card">';
+                html += '<div class="emoji">' + (discovered ? s.emoji : '❓') + '</div>';
+                html += '<div class="name">' + (discovered ? s.name : '???') + '</div>';
+                if (discovered) html += '<div style="font-size: 10px; opacity: 0.7;">' + s.rarity + '</div>';
+                html += '</div>';
+            }
+            
+            grid.innerHTML = html || '<div class="card">Loading species...</div>';
+        }
+        
+        // Update steplings grid
+        function updateSteplingsGrid() {
+            var grid = document.getElementById('steplings-grid');
+            var html = '';
+            
+            if (playerSteplings.length === 0) {
+                html = '<div class="card">No steplings yet!</div>';
+            } else {
+                for (var i = 0; i < playerSteplings.length; i++) {
+                    var s = playerSteplings[i];
+                    var species = s.species || { name: 'Unknown', emoji: '❓' };
+                    html += '<div class="card" onclick="selectStepling(\'' + s.id + '\')">';
+                    html += '<div class="emoji">' + species.emoji + '</div>';
+                    html += '<div class="name">' + species.name + '</div>';
+                    html += '<div style="font-size: 10px;">Lv.' + s.level + ' F.' + s.fusionLevel + '</div>';
+                    html += '</div>';
+                }
+            }
+            
+            grid.innerHTML = html;
+        }
+        
+        // Select stepling
+        function selectStepling(steplingId) {
+            var stepling = playerSteplings.find(s => s.id === steplingId);
+            if (stepling) {
+                var species = stepling.species || { name: 'Unknown' };
+                log('Selected ' + species.name + ' (Lv.' + stepling.level + ' F.' + stepling.fusionLevel + ')');
+            }
+        }
+        
+        // Save/load
+        function saveGame() {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('stepScientistsFull', JSON.stringify(game));
+            }
+        }
+        
+        function loadGame() {
+            if (typeof localStorage !== 'undefined') {
+                var saved = localStorage.getItem('stepScientistsFull');
+                if (saved) {
+                    var loadedGame = JSON.parse(saved);
+                    // Merge with default game object to ensure all properties exist
+                    game = Object.assign({
+                        steps: 0,
+                        mode: 'discovery',
+                        cells: 0,
+                        experience: 0,
+                        magnifyingGlass: 0,
+                        discoveredSpecies: [],
+                        milestonesReached: []
+                    }, loadedGame);
+                    
+                    // Ensure milestonesReached is an array
+                    if (!Array.isArray(game.milestonesReached)) {
+                        game.milestonesReached = [];
+                    }
+                    
+                    log('Game loaded!');
+                }
+            }
+        }
+        
+        // Log
+        function log(message) {
+            var logEl = document.getElementById('log');
+            var time = new Date().toLocaleTimeString();
+            logEl.innerHTML = '[' + time + '] ' + message;
+            console.log('[Step Scientists] ' + message);
+        }
+        
+        // Start
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

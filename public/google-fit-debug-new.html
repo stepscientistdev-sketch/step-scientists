@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Fit Debug Test - Modern Version</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #3367d6; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+        .info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Google Fit Debug Test - MODERN VERSION</h1>
+
+    <div class="test-section">
+        <h3>Step 1: Modern Google Identity Services</h3>
+        <p>Client ID: <code>570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com</code></p>
+        <p>Current Domain: <code id="current-domain"></code></p>
+        <button onclick="initializeGIS()">Initialize Google Identity</button>
+        <button onclick="signInBasic()">Sign In (Basic)</button>
+        <button onclick="signInFitness()">Sign In (Fitness)</button>
+        <button onclick="signOut()">Sign Out</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 2: Test Fitness API</h3>
+        <button onclick="getStepData()">Get Step Data</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Debug Log</h3>
+        <div id="log" class="log">Ready to test modern Google Identity Services...\n</div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
+    <script>
+        const CLIENT_ID = '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/fitness/v1/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/fitness.activity.read';
+
+        let tokenClient;
+        let accessToken = null;
+        let gisInited = false;
+        let gapiInited = false;
+
+        document.getElementById('current-domain').textContent = window.location.origin;
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logEl.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = 'Log cleared...\n';
+        }
+
+        // Initialize Google Identity Services
+        function initializeGIS() {
+            log('Initializing Google Identity Services...', 'info');
+            
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (tokenResponse) => {
+                        accessToken = tokenResponse.access_token;
+                        log('✅ Access token received!', 'success');
+                        log('Token: ' + accessToken.substring(0, 20) + '...', 'info');
+                    },
+                });
+                
+                gisInited = true;
+                log('✅ Google Identity Services initialized', 'success');
+                
+                // Also initialize gapi for API calls
+                if (typeof gapi !== 'undefined') {
+                    gapi.load('client', async () => {
+                        await gapi.client.init({
+                            discoveryDocs: [DISCOVERY_DOC],
+                        });
+                        gapiInited = true;
+                        log('✅ Google API client initialized', 'success');
+                    });
+                }
+                
+            } catch (error) {
+                log('❌ Failed to initialize: ' + error.message, 'error');
+            }
+        }
+
+        function signInBasic() {
+            log('Testing basic sign in...', 'info');
+            
+            if (!gisInited) {
+                log('❌ Google Identity Services not initialized. Click "Initialize" first.', 'error');
+                return;
+            }
+
+            try {
+                // Create a basic token client for profile only
+                const basicTokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: 'profile email',
+                    callback: (tokenResponse) => {
+                        log('✅ Basic sign in successful!', 'success');
+                        log('Access token received: ' + tokenResponse.access_token.substring(0, 20) + '...', 'info');
+                        
+                        // Get user info
+                        fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenResponse.access_token}`)
+                            .then(response => response.json())
+                            .then(userInfo => {
+                                log('User: ' + userInfo.name + ' (' + userInfo.email + ')', 'success');
+                            })
+                            .catch(error => {
+                                log('Failed to get user info: ' + error.message, 'error');
+                            });
+                    },
+                });
+                
+                basicTokenClient.requestAccessToken();
+                
+            } catch (error) {
+                log('❌ Basic sign in failed: ' + error.message, 'error');
+            }
+        }
+
+        function signInFitness() {
+            log('Testing fitness sign in...', 'info');
+            
+            if (!gisInited) {
+                log('❌ Google Identity Services not initialized. Click "Initialize" first.', 'error');
+                return;
+            }
+
+            try {
+                tokenClient.requestAccessToken();
+            } catch (error) {
+                log('❌ Fitness sign in failed: ' + error.message, 'error');
+            }
+        }
+
+        function signOut() {
+            if (accessToken) {
+                google.accounts.oauth2.revoke(accessToken);
+                accessToken = null;
+                log('✅ Signed out successfully', 'success');
+            } else {
+                log('ℹ️ Not signed in', 'info');
+            }
+        }
+
+        async function getStepData() {
+            if (!accessToken) {
+                log('❌ Not signed in. Sign in first.', 'error');
+                return;
+            }
+
+            if (!gapiInited) {
+                log('❌ Google API not initialized. Click "Initialize" first.', 'error');
+                return;
+            }
+
+            try {
+                log('Getting step data...', 'info');
+                
+                const today = new Date();
+                const startOfDay = new Date(today);
+                startOfDay.setHours(0, 0, 0, 0);
+                
+                const endOfDay = new Date(today);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                log('Date range: ' + startOfDay.toISOString() + ' to ' + endOfDay.toISOString(), 'info');
+
+                // First, let's see what data sources are available
+                log('Checking available data sources...', 'info');
+                
+                const dataSourcesResponse = await gapi.client.request({
+                    path: 'https://www.googleapis.com/fitness/v1/users/me/dataSources',
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                log('Available data sources:', 'info');
+                if (dataSourcesResponse.result.dataSource) {
+                    dataSourcesResponse.result.dataSource.forEach(source => {
+                        if (source.dataType.name.includes('step')) {
+                            log('- ' + source.dataStreamId + ' (' + source.dataType.name + ')', 'info');
+                        }
+                    });
+                } else {
+                    log('No data sources found', 'info');
+                }
+
+                // Try multiple approaches to get step data
+                const approaches = [
+                    {
+                        name: 'Estimated steps (default)',
+                        dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
+                    },
+                    {
+                        name: 'All step count sources',
+                        dataSourceId: null // Will aggregate all sources
+                    },
+                    {
+                        name: 'Raw step count',
+                        dataSourceId: 'raw:com.google.step_count.delta:com.google.android.gms:step_count'
+                    }
+                ];
+
+                for (const approach of approaches) {
+                    try {
+                        log(`\nTrying: ${approach.name}`, 'info');
+                        
+                        const aggregateRequest = {
+                            aggregateBy: [{
+                                dataTypeName: 'com.google.step_count.delta',
+                                ...(approach.dataSourceId && { dataSourceId: approach.dataSourceId })
+                            }],
+                            bucketByTime: { durationMillis: 86400000 }, // 1 day
+                            startTimeMillis: startOfDay.getTime(),
+                            endTimeMillis: endOfDay.getTime()
+                        };
+
+                        log('Request: ' + JSON.stringify(aggregateRequest, null, 2), 'info');
+
+                        const response = await gapi.client.request({
+                            path: 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+                            method: 'POST',
+                            body: aggregateRequest,
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        log('Response: ' + JSON.stringify(response.result, null, 2), 'info');
+
+                        let totalSteps = 0;
+                        if (response.result.bucket && response.result.bucket.length > 0) {
+                            response.result.bucket.forEach(bucket => {
+                                if (bucket.dataset && bucket.dataset.length > 0) {
+                                    bucket.dataset.forEach(dataset => {
+                                        if (dataset.point && dataset.point.length > 0) {
+                                            dataset.point.forEach(point => {
+                                                if (point.value && point.value.length > 0) {
+                                                    totalSteps += point.value[0].intVal || 0;
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        log(`${approach.name}: ${totalSteps.toLocaleString()} steps`, totalSteps > 0 ? 'success' : 'info');
+                        
+                        if (totalSteps > 0) {
+                            log('🚶‍♂️ Found step data! Total: ' + totalSteps.toLocaleString(), 'success');
+                            return; // Stop trying other approaches
+                        }
+
+                    } catch (error) {
+                        log(`${approach.name} failed: ${error.message}`, 'error');
+                    }
+                }
+
+                // If no steps found, try getting data for the last 7 days
+                log('\nTrying last 7 days...', 'info');
+                const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                
+                try {
+                    const weekRequest = {
+                        aggregateBy: [{
+                            dataTypeName: 'com.google.step_count.delta'
+                        }],
+                        bucketByTime: { durationMillis: 24 * 60 * 60 * 1000 }, // 1 day buckets
+                        startTimeMillis: weekAgo.getTime(),
+                        endTimeMillis: today.getTime()
+                    };
+
+                    const weekResponse = await gapi.client.request({
+                        path: 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+                        method: 'POST',
+                        body: weekRequest,
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    log('Last 7 days response: ' + JSON.stringify(weekResponse.result, null, 2), 'info');
+
+                    let weekTotal = 0;
+                    if (weekResponse.result.bucket) {
+                        weekResponse.result.bucket.forEach((bucket, index) => {
+                            let daySteps = 0;
+                            if (bucket.dataset && bucket.dataset.length > 0) {
+                                bucket.dataset.forEach(dataset => {
+                                    if (dataset.point && dataset.point.length > 0) {
+                                        dataset.point.forEach(point => {
+                                            if (point.value && point.value.length > 0) {
+                                                daySteps += point.value[0].intVal || 0;
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                            weekTotal += daySteps;
+                            if (daySteps > 0) {
+                                const date = new Date(weekAgo.getTime() + index * 24 * 60 * 60 * 1000);
+                                log(`${date.toDateString()}: ${daySteps} steps`, 'success');
+                            }
+                        });
+                    }
+
+                    if (weekTotal > 0) {
+                        log(`📊 Total steps in last 7 days: ${weekTotal.toLocaleString()}`, 'success');
+                    } else {
+                        log('❌ No step data found in the last 7 days', 'error');
+                        log('💡 Possible issues:', 'info');
+                        log('- Google Fit app not installed or set up on your device', 'info');
+                        log('- No step data recorded (try walking with your phone)', 'info');
+                        log('- Data sync issues between device and Google Fit', 'info');
+                        log('- Privacy settings blocking data access', 'info');
+                    }
+
+                } catch (error) {
+                    log('Week data failed: ' + error.message, 'error');
+                }
+
+            } catch (error) {
+                log('❌ Failed to get step data: ' + error.message, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        // Auto-initialize when page loads
+        window.onload = function() {
+            setTimeout(() => {
+                if (typeof google !== 'undefined' && google.accounts) {
+                    initializeGIS();
+                } else {
+                    log('Waiting for Google Identity Services to load...', 'info');
+                    setTimeout(() => {
+                        if (typeof google !== 'undefined' && google.accounts) {
+                            initializeGIS();
+                        } else {
+                            log('❌ Google Identity Services failed to load', 'error');
+                        }
+                    }, 2000);
+                }
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

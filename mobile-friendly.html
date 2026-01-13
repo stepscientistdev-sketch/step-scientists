@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mobile Friendly Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { 
+            font-size: 24px; 
+            padding: 20px; 
+            background: #333; 
+            color: white; 
+            text-align: center;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        button { 
+            font-size: 30px; 
+            padding: 20px; 
+            margin: 20px; 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 10px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+            touch-action: manipulation;
+        }
+        button:active {
+            background: #45a049;
+            transform: scale(0.95);
+        }
+        #result { 
+            font-size: 40px; 
+            margin: 30px; 
+            background: #666; 
+            padding: 20px; 
+            border-radius: 10px; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobile Test</h1>
+    <div id="result">0</div>
+    <button id="clickBtn">Tap Me!</button>
+    <div id="status">Loading...</div>
+
+    <script>
+        var count = 0;
+        
+        function clickMe() {
+            count = count + 1;
+            document.getElementById('result').innerHTML = count;
+            document.getElementById('status').innerHTML = 'Tapped ' + count + ' times!';
+        }
+        
+        // Add multiple event listeners for better mobile support
+        var btn = document.getElementById('clickBtn');
+        btn.onclick = clickMe;
+        btn.ontouchstart = function(e) {
+            e.preventDefault();
+            clickMe();
+        };
+        
+        document.getElementById('status').innerHTML = 'Ready! Tap the button.';
+    </script>
+</body>
+</html>

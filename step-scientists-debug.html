@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step Scientists - Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .step-count {
+            font-size: 60px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        
+        button {
+            font-size: 20px;
+            padding: 15px 30px;
+            margin: 10px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.3);
+            color: white;
+            cursor: pointer;
+        }
+        
+        button:active {
+            background: rgba(255,255,255,0.5);
+        }
+        
+        .resources {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        
+        .resource {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            min-width: 80px;
+        }
+        
+        .debug {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Step Scientists</h1>
+    
+    <div class="step-count" id="steps">0</div>
+    <div>Steps</div>
+    
+    <div class="resources">
+        <div class="resource">
+            <div id="cells" style="font-size: 24px; font-weight: bold;">0</div>
+            <div>Cells</div>
+        </div>
+        <div class="resource">
+            <div id="exp" style="font-size: 24px; font-weight: bold;">0</div>
+            <div>Experience</div>
+        </div>
+    </div>
+    
+    <div>
+        <button onclick="addSteps()">+100 Steps</button>
+        <button onclick="switchMode()">Switch Mode</button>
+    </div>
+    
+    <div>
+        <button onclick="inspectCell()" id="inspect">Inspect Cell</button>
+        <button onclick="resetAll()">Reset</button>
+    </div>
+    
+    <div id="mode" style="margin: 20px 0; font-size: 18px;">🔍 Discovery Mode</div>
+    
+    <div class="debug" id="log">Tap +100 Steps to test!</div>
+
+    <script>
+        // Simple game state
+        var steps = 0;
+        var cells = 0;
+        var exp = 0;
+        var mode = 'discovery'; // 'discovery' or 'training'
+        
+        function addSteps() {
+            try {
+                steps += 100;
+                
+                if (mode === 'discovery') {
+                    var newCells = Math.floor(steps / 1000);
+                    if (newCells > cells) {
+                        cells = newCells;
+                        log('Earned ' + (newCells - cells + 1) + ' cells!');
+                    } else {
+                        var needed = 1000 - (steps % 1000);
+                        log(needed + ' more steps for next cell');
+                    }
+                } else {
+                    var newExp = Math.floor(steps / 10);
+                    if (newExp > exp) {
+                        exp = newExp;
+                        log('Earned ' + (newExp - exp + 1) + ' experience!');
+                    }
+                }
+                
+                updateDisplay();
+                log('Added 100 steps! Total: ' + steps);
+                
+            } catch (error) {
+                log('ERROR in addSteps: ' + error.message);
+            }
+        }
+        
+        function switchMode() {
+            try {
+                mode = mode === 'discovery' ? 'training' : 'discovery';
+                updateDisplay();
+                log('Switched to ' + mode + ' mode');
+            } catch (error) {
+                log('ERROR in switchMode: ' + error.message);
+            }
+        }
+        
+        function inspectCell() {
+            try {
+                if (cells < 1) {
+                    log('Need at least 1 cell!');
+                    return;
+                }
+                
+                cells--;
+                var roll = Math.random() * 100;
+                var species = 'Unknown';
+                
+                if (roll < 50) species = 'Common Steppy 🐛';
+                else if (roll < 80) species = 'Rare Jogger 🐸';
+                else species = 'Epic Sprinter 🦘';
+                
+                log('Found: ' + species);
+                updateDisplay();
+                
+            } catch (error) {
+                log('ERROR in inspectCell: ' + error.message);
+            }
+        }
+        
+        function resetAll() {
+            try {
+                steps = 0;
+                cells = 0;
+                exp = 0;
+                mode = 'discovery';
+                updateDisplay();
+                log('Game reset!');
+            } catch (error) {
+                log('ERROR in resetAll: ' + error.message);
+            }
+        }
+        
+        function updateDisplay() {
+            try {
+                document.getElementById('steps').textContent = steps;
+                document.getElementById('cells').textContent = cells;
+                document.getElementById('exp').textContent = exp;
+                
+                var modeEl = document.getElementById('mode');
+                if (mode === 'discovery') {
+                    modeEl.textContent = '🔍 Discovery Mode (1000 steps = 1 cell)';
+                } else {
+                    modeEl.textContent = '💪 Training Mode (10 steps = 1 exp)';
+                }
+                
+                var inspectBtn = document.getElementById('inspect');
+                if (cells >= 1) {
+                    inspectBtn.textContent = 'Inspect Cell (' + cells + ' available)';
+                    inspectBtn.style.opacity = '1';
+                } else {
+                    inspectBtn.textContent = 'Need 1 Cell';
+                    inspectBtn.style.opacity = '0.5';
+                }
+                
+            } catch (error) {
+                log('ERROR in updateDisplay: ' + error.message);
+            }
+        }
+        
+        function log(message) {
+            try {
+                var time = new Date().toLocaleTimeString();
+                document.getElementById('log').textContent = '[' + time + '] ' + message;
+                console.log(message);
+            } catch (error) {
+                console.error('ERROR in log:', error);
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                updateDisplay();
+                log('Step Scientists loaded! Ready to play.');
+            } catch (error) {
+                console.error('ERROR in init:', error);
+                document.getElementById('log').textContent = 'ERROR: ' + error.message;
+            }
+        });
+        
+        // Test that JavaScript is working
+        log('JavaScript is running...');
+    </script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Step Scientists</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .app {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .step-display {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-count {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .mode-display {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .resources {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .resource {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .resource-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .resource-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.95);
+        }
+        
+        .btn-primary {
+            background: rgba(76, 175, 80, 0.8);
+        }
+        
+        .btn-secondary {
+            background: rgba(33, 150, 243, 0.8);
+        }
+        
+        .species-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .species-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .species-emoji {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .species-name {
+            font-size: 12px;
+        }
+        
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>🧪 Step Scientists</h1>
+        </div>
+        
+        <div class="step-display">
+            <div id="step-count" class="step-count">0</div>
+            <div>Steps Today</div>
+        </div>
+        
+        <div class="mode-display">
+            <div id="mode-title">🔍 Discovery Mode</div>
+            <div id="mode-desc">1000 steps = 1 cell</div>
+        </div>
+        
+        <div class="resources">
+            <div class="resource">
+                <div id="cells" class="resource-value">0</div>
+                <div class="resource-label">Cells</div>
+            </div>
+            <div class="resource">
+                <div id="exp" class="resource-value">0</div>
+                <div class="resource-label">Experience</div>
+            </div>
+            <div class="resource">
+                <div id="glass" class="resource-value">0</div>
+                <div class="resource-label">🔍 Glass</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="addSteps()">+100 Steps</button>
+            <button class="btn btn-secondary" onclick="switchMode()">Switch Mode</button>
+            <button class="btn" onclick="inspectCell()" id="inspect-btn">Inspect Cell</button>
+            <button class="btn" onclick="enableMotion()">Enable Motion</button>
+        </div>
+        
+        <div class="species-section">
+            <h3>Species Collection</h3>
+            <div id="species-grid" class="species-grid">
+                <!-- Species will be populated here -->
+            </div>
+        </div>
+        
+        <div id="log" class="log">Step Scientists loaded! Ready to play.</div>
+    </div>
+
+    <script>
+        // Game state
+        var game = {
+            steps: 0,
+            mode: 'discovery', // 'discovery' or 'training'
+            cells: 0,
+            experience: 0,
+            magnifyingGlass: 0,
+            discoveredSpecies: []
+        };
+        
+        // Species data
+        var species = [
+            { id: 1, name: 'Steppy', emoji: '🐛', rarity: 'common' },
+            { id: 2, name: 'Walkius', emoji: '🦎', rarity: 'common' },
+            { id: 3, name: 'Jogger', emoji: '🐸', rarity: 'uncommon' },
+            { id: 4, name: 'Sprinter', emoji: '🦘', rarity: 'rare' },
+            { id: 5, name: 'Marathon', emoji: '🦅', rarity: 'epic' },
+            { id: 6, name: 'Legendary', emoji: '🐉', rarity: 'legendary' }
+        ];
+        
+        // Add steps
+        function addSteps() {
+            var oldSteps = game.steps;
+            game.steps += 100;
+            
+            if (game.mode === 'discovery') {
+                // Calculate cells earned from this step increment
+                var oldCellsEarned = Math.floor(oldSteps / 1000);
+                var newCellsEarned = Math.floor(game.steps / 1000);
+                var cellsToAdd = newCellsEarned - oldCellsEarned;
+                
+                if (cellsToAdd > 0) {
+                    game.cells += cellsToAdd;
+                    log('Earned ' + cellsToAdd + ' cells!');
+                } else {
+                    var needed = 1000 - (game.steps % 1000);
+                    log(needed + ' more steps for next cell');
+                }
+            } else {
+                // Calculate experience earned from this step increment
+                var oldExpEarned = Math.floor(oldSteps / 10);
+                var newExpEarned = Math.floor(game.steps / 10);
+                var expToAdd = newExpEarned - oldExpEarned;
+                
+                if (expToAdd > 0) {
+                    game.experience += expToAdd;
+                    log('Earned ' + expToAdd + ' experience!');
+                }
+            }
+            
+            checkMilestones();
+            updateDisplay();
+            saveGame();
+        }
+        
+        // Switch mode
+        function switchMode() {
+            game.mode = game.mode === 'discovery' ? 'training' : 'discovery';
+            updateDisplay();
+            log('Switched to ' + game.mode + ' mode');
+            saveGame();
+        }
+        
+        // Inspect cell
+        function inspectCell() {
+            if (game.cells < 1) {
+                log('Need at least 1 cell to inspect!');
+                return;
+            }
+            
+            game.cells--;
+            
+            // Much more challenging discovery algorithm
+            var roll = Math.random() * 1000; // Use 1000 for more precision
+            var found;
+            
+            if (roll < 500) found = 1;        // 50.0% Common (Steppy)
+            else if (roll < 750) found = 2;   // 25.0% Common (Walkius)
+            else if (roll < 900) found = 3;   // 15.0% Uncommon (Jogger)
+            else if (roll < 970) found = 4;   //  7.0% Rare (Sprinter)
+            else if (roll < 995) found = 5;   //  2.5% Epic (Marathon)
+            else found = 6;                   //  0.5% Legendary (Dragon)
+            
+            var s = species[found - 1];
+            
+            if (game.discoveredSpecies.indexOf(found) === -1) {
+                game.discoveredSpecies.push(found);
+                log('🎉 NEW SPECIES! Found ' + s.rarity.toUpperCase() + ' ' + s.name + ' ' + s.emoji);
+            } else {
+                log('Found ' + s.rarity + ' ' + s.name + ' ' + s.emoji + ' (already discovered)');
+            }
+            
+            updateDisplay();
+            saveGame();
+        }
+        
+        // Check milestones
+        function checkMilestones() {
+            var milestones = [5000, 10000, 50000, 100000];
+            for (var i = 0; i < milestones.length; i++) {
+                if (game.steps >= milestones[i] && game.magnifyingGlass <= i) {
+                    game.magnifyingGlass = i + 1;
+                    log('🎉 ' + milestones[i] + ' steps milestone! Earned magnifying glass!');
+                }
+            }
+        }
+        
+        // Enable motion detection
+        function enableMotion() {
+            if (typeof DeviceMotionEvent !== 'undefined') {
+                if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                    DeviceMotionEvent.requestPermission().then(function(response) {
+                        if (response === 'granted') {
+                            startMotionTracking();
+                            log('Motion tracking enabled!');
+                        } else {
+                            log('Motion permission denied');
+                        }
+                    });
+                } else {
+                    startMotionTracking();
+                    log('Motion tracking started!');
+                }
+            } else {
+                log('Motion detection not supported');
+            }
+        }
+        
+        // Motion tracking
+        var lastAcceleration = { x: 0, y: 0, z: 0 };
+        var stepThreshold = 1.2;
+        
+        function startMotionTracking() {
+            window.addEventListener('devicemotion', function(event) {
+                if (event.acceleration) {
+                    var acc = event.acceleration;
+                    var totalAcc = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
+                    var lastTotal = Math.sqrt(
+                        lastAcceleration.x * lastAcceleration.x +
+                        lastAcceleration.y * lastAcceleration.y +
+                        lastAcceleration.z * lastAcceleration.z
+                    );
+                    
+                    if (Math.abs(totalAcc - lastTotal) > stepThreshold) {
+                        var oldSteps = game.steps;
+                        game.steps++;
+                        
+                        if (game.mode === 'discovery') {
+                            var oldCellsEarned = Math.floor(oldSteps / 1000);
+                            var newCellsEarned = Math.floor(game.steps / 1000);
+                            if (newCellsEarned > oldCellsEarned) {
+                                game.cells++;
+                                log('Earned 1 cell from walking!');
+                            }
+                        } else {
+                            var oldExpEarned = Math.floor(oldSteps / 10);
+                            var newExpEarned = Math.floor(game.steps / 10);
+                            if (newExpEarned > oldExpEarned) {
+                                game.experience++;
+                                log('Earned 1 experience from walking!');
+                            }
+                        }
+                        
+                        checkMilestones();
+                        updateDisplay();
+                        saveGame();
+                    }
+                    
+                    lastAcceleration = acc;
+                }
+            });
+        }
+        
+        // Update display
+        function updateDisplay() {
+            document.getElementById('step-count').innerHTML = game.steps;
+            document.getElementById('cells').innerHTML = game.cells;
+            document.getElementById('exp').innerHTML = game.experience;
+            document.getElementById('glass').innerHTML = game.magnifyingGlass;
+            
+            // Update mode
+            if (game.mode === 'discovery') {
+                document.getElementById('mode-title').innerHTML = '🔍 Discovery Mode';
+                document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell';
+            } else {
+                document.getElementById('mode-title').innerHTML = '💪 Training Mode';
+                document.getElementById('mode-desc').innerHTML = '10 steps = 1 experience';
+            }
+            
+            // Update inspect button
+            var inspectBtn = document.getElementById('inspect-btn');
+            if (game.cells >= 1) {
+                inspectBtn.innerHTML = 'Inspect Cell (' + game.cells + ')';
+                inspectBtn.style.opacity = '1';
+            } else {
+                inspectBtn.innerHTML = 'Need 1 Cell';
+                inspectBtn.style.opacity = '0.5';
+            }
+            
+            updateSpeciesGrid();
+        }
+        
+        // Update species grid
+        function updateSpeciesGrid() {
+            var grid = document.getElementById('species-grid');
+            var html = '';
+            
+            for (var i = 0; i < species.length; i++) {
+                var s = species[i];
+                var discovered = game.discoveredSpecies.indexOf(s.id) !== -1;
+                html += '<div class="species-card">';
+                html += '<div class="species-emoji">' + (discovered ? s.emoji : '❓') + '</div>';
+                html += '<div class="species-name">' + (discovered ? s.name : '???') + '</div>';
+                html += '</div>';
+            }
+            
+            grid.innerHTML = html;
+        }
+        
+        // Save/load game
+        function saveGame() {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('stepScientists', JSON.stringify(game));
+            }
+        }
+        
+        function loadGame() {
+            if (typeof localStorage !== 'undefined') {
+                var saved = localStorage.getItem('stepScientists');
+                if (saved) {
+                    game = JSON.parse(saved);
+                    log('Game loaded!');
+                }
+            }
+        }
+        
+        // Log function
+        function log(message) {
+            var logEl = document.getElementById('log');
+            var time = new Date().toLocaleTimeString();
+            logEl.innerHTML = '[' + time + '] ' + message;
+        }
+        
+        // Initialize
+        loadGame();
+        updateDisplay();
+        log('Step Scientists ready! Tap +100 Steps to play.');
+    </script>
+</body>
+</html>

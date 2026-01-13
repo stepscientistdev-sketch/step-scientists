@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connection Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Backend Connection Test</h1>
+    <div id="results"></div>
+    <button onclick="testConnection()">Test Connection</button>
+
+    <script>
+        async function testConnection() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="info">Testing connection...</div>';
+            
+            const tests = [
+                { name: 'Backend Health Check', url: 'http://192.168.1.111:3000/health' },
+                { name: 'Species API', url: 'http://192.168.1.111:3000/api/species/all' },
+                { name: 'Local Server', url: 'http://192.168.1.111:8080/' }
+            ];
+            
+            let html = '';
+            
+            for (const test of tests) {
+                try {
+                    const response = await fetch(test.url);
+                    if (response.ok) {
+                        html += `<div class="success">✅ ${test.name}: Connected (${response.status})</div>`;
+                    } else {
+                        html += `<div class="error">❌ ${test.name}: Failed (${response.status})</div>`;
+                    }
+                } catch (error) {
+                    html += `<div class="error">❌ ${test.name}: Error - ${error.message}</div>`;
+                }
+            }
+            
+            results.innerHTML = html;
+        }
+        
+        // Auto-test on load
+        window.onload = testConnection;
+    </script>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Google Fit Debug Test - Updated Jan 12 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #3367d6;
+        }
+
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .info {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔧 Google Fit Debug Test - UPDATED VERSION</h1>
+
+    <div class="test-section">
+        <h3>Step 1: Test OAuth Configuration</h3>
+        <p>Client ID: <code id="client-id-display">570511343860-bjrh86v7rmqvchn9qmodb6r7bhq8g2j7.apps.googleusercontent.com</code></p>
+        <p>Current Domain: <code id="current-domain"></code></p>
+        <button onclick="testOAuth()">Test OAuth Setup</button>
+        <button onclick="switchClientId()">Switch Client ID</button>
+        <button onclick="testDirectOAuth()">Test Direct OAuth</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 2: Test Google API Loading</h3>
+        <button onclick="testGoogleAPI()">Load Google API</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 3: Test Authentication (Basic)</h3>
+        <button onclick="testBasicAuth()">Test Basic Sign In</button>
+        <button onclick="testAuth()">Test Fitness Sign In</button>
+        <button onclick="testSignOut()">Sign Out</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 4: Test Fitness API</h3>
+        <button onclick="testFitnessAPI()">Get Step Data</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Debug Log</h3>
+        <div id="log" class="log">Ready to test...\n</div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        // Set current domain
+        document.getElementById('current-domain').textContent = window.location.origin;
+
+        // Multiple client IDs to test
+        const CLIENT_IDS = [
+            '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com', // Working one with Vercel domain
+            '570511343860-bjrh86v7rmqvchn9qmodb6r7bhq8g2j7.apps.googleusercontent.com'  // Setup docs one
+        ];
+        
+        let currentClientIdIndex = 0;
+        let currentClientId = CLIENT_IDS[currentClientIdIndex];
+        let authInstance = null;
+
+        // Update display
+        document.getElementById('client-id-display').textContent = currentClientId;
+
+        function switchClientId() {
+            currentClientIdIndex = (currentClientIdIndex + 1) % CLIENT_IDS.length;
+            currentClientId = CLIENT_IDS[currentClientIdIndex];
+            document.getElementById('client-id-display').textContent = currentClientId;
+            log('Switched to client ID: ' + currentClientId, 'info');
+            
+            // Reset auth instance
+            authInstance = null;
+        }
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logEl.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = 'Log cleared...\n';
+        }
+
+        async function testOAuth() {
+            try {
+                log('Testing OAuth configuration...', 'info');
+                log('Current URL: ' + window.location.href, 'info');
+                log('Origin: ' + window.location.origin, 'info');
+                log('Protocol: ' + window.location.protocol, 'info');
+                log('Host: ' + window.location.host, 'info');
+                log('Client ID: ' + currentClientId, 'info');
+
+                // This will fail if domain isn't added to OAuth config
+                const response = await fetch('https://accounts.google.com/.well-known/openid_configuration');
+                if (response.ok) {
+                    log('✅ Google OAuth endpoints accessible', 'success');
+                } else {
+                    log('❌ Cannot access Google OAuth endpoints', 'error');
+                }
+
+                // Test if we can reach Google's OAuth service
+                try {
+                    const testUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${currentClientId}&response_type=code&scope=profile&redirect_uri=${encodeURIComponent(window.location.origin)}&state=test`;
+                    log('Test OAuth URL: ' + testUrl, 'info');
+                } catch (e) {
+                    log('Error constructing OAuth URL: ' + e.message, 'error');
+                }
+
+            } catch (error) {
+                log('❌ OAuth test failed: ' + error.message, 'error');
+            }
+        }
+
+        async function testDirectOAuth() {
+            try {
+                log('Testing direct OAuth redirect...', 'info');
+                
+                const redirectUri = window.location.origin + window.location.pathname;
+                const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                    `client_id=${currentClientId}&` +
+                    `response_type=code&` +
+                    `scope=profile email&` +
+                    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+                    `state=test_direct`;
+                
+                log('Redirect URI: ' + redirectUri, 'info');
+                log('OAuth URL: ' + oauthUrl, 'info');
+                log('Opening OAuth popup...', 'info');
+                
+                // Open in popup to see the error
+                const popup = window.open(oauthUrl, 'oauth', 'width=500,height=600');
+                
+                if (!popup) {
+                    log('❌ Popup blocked - allow popups and try again', 'error');
+                    return;
+                }
+                
+                // Check if popup closes (user completed or error occurred)
+                const checkClosed = setInterval(() => {
+                    if (popup.closed) {
+                        clearInterval(checkClosed);
+                        log('OAuth popup closed', 'info');
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                log('❌ Direct OAuth test failed: ' + error.message, 'error');
+            }
+        }
+
+        async function testGoogleAPI() {
+            try {
+                log('Loading Google API...', 'info');
+
+                if (!window.gapi) {
+                    const script = document.createElement('script');
+                    script.src = 'https://apis.google.com/js/api.js';
+
+                    await new Promise((resolve, reject) => {
+                        script.onload = resolve;
+                        script.onerror = () => reject(new Error('Failed to load Google API script'));
+                        document.head.appendChild(script);
+                    });
+                }
+
+                log('✅ Google API script loaded', 'success');
+
+                // Load auth2
+                await new Promise((resolve, reject) => {
+                    window.gapi.load('auth2', (result) => {
+                        if (result && result.error) {
+                            reject(new Error('Failed to load auth2: ' + result.error));
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                log('✅ Google Auth2 library loaded', 'success');
+
+            } catch (error) {
+                log('❌ Google API loading failed: ' + error.message, 'error');
+            }
+        }
+
+        async function testBasicAuth() {
+            try {
+                log('Testing basic authentication (no fitness scope)...', 'info');
+
+                if (!window.gapi || !window.gapi.auth2) {
+                    log('❌ Google API not loaded. Run "Load Google API" first.', 'error');
+                    return;
+                }
+
+                // Initialize auth with basic scope only
+                const basicAuthInstance = window.gapi.auth2.init({
+                    client_id: currentClientId,
+                    scope: 'profile email'
+                });
+
+                log('✅ Basic auth instance initialized', 'success');
+
+                // Test basic sign in
+                if (!basicAuthInstance.isSignedIn.get()) {
+                    log('Requesting basic sign in...', 'info');
+                    const user = await basicAuthInstance.signIn({
+                        prompt: 'select_account'  // Allow account selection
+                    });
+                    log('✅ Basic sign in successful', 'success');
+
+                    const profile = user.getBasicProfile();
+                    log('User: ' + profile.getName() + ' (' + profile.getEmail() + ')', 'info');
+                } else {
+                    log('✅ Already signed in', 'success');
+                    const user = basicAuthInstance.currentUser.get();
+                    const profile = user.getBasicProfile();
+                    log('User: ' + profile.getName() + ' (' + profile.getEmail() + ')', 'info');
+                }
+
+            } catch (error) {
+                log('❌ Basic authentication failed: ' + (error.message || error.error || 'Unknown error'), 'error');
+                log('Full error: ' + JSON.stringify(error, null, 2), 'error');
+                
+                // Suggest trying the other client ID
+                if (error.error === 'unauthorized_client') {
+                    log('💡 Try switching to the other client ID and test again', 'info');
+                }
+            }
+        }
+
+        async function testAuth() {
+            try {
+                log('Testing authentication with fitness scope...', 'info');
+
+                if (!window.gapi || !window.gapi.auth2) {
+                    log('❌ Google API not loaded. Run "Load Google API" first.', 'error');
+                    return;
+                }
+
+                // Initialize auth
+                authInstance = window.gapi.auth2.init({
+                    client_id: currentClientId,
+                    scope: 'https://www.googleapis.com/auth/fitness.activity.read'
+                });
+
+                log('✅ Auth instance initialized', 'success');
+
+                // Check if already signed in
+                if (authInstance.isSignedIn.get()) {
+                    log('✅ Already signed in', 'success');
+                    const user = authInstance.currentUser.get();
+                    const profile = user.getBasicProfile();
+                    log('User: ' + profile.getName() + ' (' + profile.getEmail() + ')', 'info');
+                    
+                    // Check granted scopes
+                    const authResponse = user.getAuthResponse();
+                    log('Granted scopes: ' + authResponse.scope, 'info');
+                } else {
+                    log('Requesting sign in with fitness permissions...', 'info');
+
+                    // More detailed error handling for sign in
+                    try {
+                        const user = await authInstance.signIn({
+                            prompt: 'select_account'  // Allow account selection
+                        });
+
+                        log('✅ Sign in successful', 'success');
+                        const profile = user.getBasicProfile();
+                        log('User: ' + profile.getName() + ' (' + profile.getEmail() + ')', 'info');
+
+                        // Check granted scopes
+                        const authResponse = user.getAuthResponse();
+                        log('Granted scopes: ' + authResponse.scope, 'info');
+
+                    } catch (signInError) {
+                        log('❌ Sign in error details:', 'error');
+                        log('Error object: ' + JSON.stringify(signInError, null, 2), 'error');
+
+                        if (signInError.error) {
+                            log('Error code: ' + signInError.error, 'error');
+                        }
+                        if (signInError.details) {
+                            log('Error details: ' + signInError.details, 'error');
+                        }
+
+                        // Common error interpretations
+                        if (signInError.error === 'popup_closed_by_user') {
+                            log('💡 User closed the popup - try again', 'info');
+                        } else if (signInError.error === 'access_denied') {
+                            log('💡 User denied access - need to grant fitness permissions', 'info');
+                        } else if (signInError.error === 'unauthorized_client') {
+                            log('💡 OAuth client not authorized - try switching client ID', 'info');
+                        }
+
+                        throw signInError;
+                    }
+                }
+
+            } catch (error) {
+                log('❌ Authentication failed: ' + (error.message || error.error || 'Unknown error'), 'error');
+                log('Full error: ' + JSON.stringify(error, null, 2), 'error');
+
+                if (error.message && error.message.includes('popup_blocked')) {
+                    log('💡 Tip: Allow popups for this site', 'info');
+                } else if (error.message && error.message.includes('unauthorized_client')) {
+                    log('💡 Tip: Add this domain to Google Cloud Console OAuth config', 'info');
+                }
+            }
+        }
+
+        async function testSignOut() {
+            try {
+                if (authInstance && authInstance.isSignedIn.get()) {
+                    await authInstance.signOut();
+                    log('✅ Signed out successfully', 'success');
+                } else {
+                    log('ℹ️ Not signed in', 'info');
+                }
+            } catch (error) {
+                log('❌ Sign out failed: ' + error.message, 'error');
+            }
+        }
+
+        async function testFitnessAPI() {
+            try {
+                log('Testing Fitness API...', 'info');
+
+                if (!authInstance || !authInstance.isSignedIn.get()) {
+                    log('❌ Not signed in. Run "Test Fitness Sign In" first.', 'error');
+                    return;
+                }
+
+                const user = authInstance.currentUser.get();
+                const authResponse = user.getAuthResponse();
+
+                if (!authResponse || !authResponse.access_token) {
+                    log('❌ No access token available', 'error');
+                    return;
+                }
+
+                log('✅ Access token obtained', 'success');
+
+                // Get today's step data
+                const today = new Date();
+                const startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+                const endTime = today.getTime();
+
+                log('Fetching step data for today...', 'info');
+
+                const response = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authResponse.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        aggregateBy: [{
+                            dataTypeName: 'com.google.step_count.delta'
+                        }],
+                        bucketByTime: { durationMillis: endTime - startTime },
+                        startTimeMillis: startTime,
+                        endTimeMillis: endTime
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('❌ Fitness API error: ' + response.status + ' - ' + errorText, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                log('✅ Fitness API response received', 'success');
+                log('Raw response: ' + JSON.stringify(data, null, 2), 'info');
+
+                // Extract step count
+                let totalSteps = 0;
+                if (data.bucket && data.bucket.length > 0) {
+                    const bucket = data.bucket[0];
+                    if (bucket.dataset && bucket.dataset.length > 0) {
+                        const dataset = bucket.dataset[0];
+                        if (dataset.point && dataset.point.length > 0) {
+                            totalSteps = dataset.point.reduce((sum, point) => {
+                                return sum + (point.value[0].intVal || 0);
+                            }, 0);
+                        }
+                    }
+                }
+
+                log('🚶‍♂️ Total steps today: ' + totalSteps, 'success');
+
+            } catch (error) {
+                log('❌ Fitness API test failed: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Step Scientists - Connected</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .app {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .connection-status {
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .connected { background: rgba(76, 175, 80, 0.3); }
+        .disconnected { background: rgba(244, 67, 54, 0.3); }
+        .connecting { background: rgba(255, 152, 0, 0.3); }
+        
+        .step-display {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-count {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .mode-display {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .resources {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .resource {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .resource-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .resource-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.95);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: rgba(76, 175, 80, 0.8);
+        }
+        
+        .btn-secondary {
+            background: rgba(33, 150, 243, 0.8);
+        }
+        
+        .species-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .species-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .species-emoji {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .species-name {
+            font-size: 12px;
+        }
+        
+        .rarity-common { border-left: 3px solid #4CAF50; }
+        .rarity-uncommon { border-left: 3px solid #2196F3; }
+        .rarity-rare { border-left: 3px solid #9C27B0; }
+        .rarity-epic { border-left: 3px solid #FF9800; }
+        .rarity-legendary { border-left: 3px solid #F44336; }
+        
+        .log {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: monospace;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>🧪 Step Scientists</h1>
+            <div id="connection-status" class="connection-status connecting">Connecting to backend...</div>
+        </div>
+        
+        <div class="step-display">
+            <div id="step-count" class="step-count">0</div>
+            <div>Steps Today</div>
+        </div>
+        
+        <div class="mode-display">
+            <div id="mode-title">🔍 Discovery Mode</div>
+            <div id="mode-desc">1000 steps = 1 cell</div>
+        </div>
+        
+        <div class="resources">
+            <div class="resource">
+                <div id="cells" class="resource-value">0</div>
+                <div class="resource-label">Cells</div>
+            </div>
+            <div class="resource">
+                <div id="exp" class="resource-value">0</div>
+                <div class="resource-label">Experience</div>
+            </div>
+            <div class="resource">
+                <div id="glass" class="resource-value">0</div>
+                <div class="resource-label">🔍 Glass</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="addSteps()">+100 Steps</button>
+            <button class="btn btn-secondary" onclick="switchMode()">Switch Mode</button>
+            <button class="btn" onclick="inspectCell()" id="inspect-btn" disabled>Inspect Cell</button>
+            <button class="btn" onclick="viewSteplings()">View Steplings</button>
+            <button class="btn" onclick="toggleMagnifyingGlass()" id="glass-btn">Use 🔍 Glass</button>
+            <button class="btn" onclick="loadSpecies()">Refresh Species</button>
+        </div>
+        
+        <div class="species-section">
+            <h3>Species Collection</h3>
+            <div id="species-grid" class="species-grid">
+                <div class="species-card">Loading...</div>
+            </div>
+        </div>
+        
+        <div id="steplings-section" class="species-section" style="display: none;">
+            <h3>My Steplings</h3>
+            <div id="steplings-grid" class="species-grid">
+                <div class="species-card">Loading steplings...</div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn" onclick="hideSteplings()">Back to Species</button>
+                <button class="btn btn-secondary" onclick="loadSteplings()">Refresh Steplings</button>
+            </div>
+        </div>
+        
+        <div id="log" class="log">Connecting to Step Scientists backend...</div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.111:3000';
+        
+        // Game state
+        var game = {
+            steps: 0,
+            mode: 'discovery',
+            cells: 0,
+            experience: 0,
+            magnifyingGlass: 0,
+            discoveredSpecies: []
+        };
+        
+        var allSpecies = [];
+        var playerSteplings = [];
+        var isConnected = false;
+        var useMagnifyingGlass = false;
+        
+        // Initialize app
+        async function init() {
+            log('Initializing Step Scientists...');
+            await testConnection();
+            loadGame();
+            await loadSpecies();
+            updateDisplay();
+        }
+        
+        // Test backend connection
+        async function testConnection() {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.textContent = 'Connecting...';
+            statusEl.className = 'connection-status connecting';
+            
+            try {
+                const response = await fetch(API_BASE + '/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusEl.textContent = '✅ Connected to Backend';
+                    statusEl.className = 'connection-status connected';
+                    isConnected = true;
+                    log('Connected to backend successfully!');
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (error) {
+                statusEl.textContent = '❌ Offline Mode';
+                statusEl.className = 'connection-status disconnected';
+                isConnected = false;
+                log('Backend connection failed - using offline mode');
+            }
+        }
+        
+        // Load species from backend
+        async function loadSpecies() {
+            if (!isConnected) {
+                log('Cannot load species - no backend connection');
+                return;
+            }
+            
+            try {
+                log('Loading species from backend...');
+                const response = await fetch(API_BASE + '/api/species/all');
+                
+                if (response.ok) {
+                    allSpecies = await response.json();
+                    log('Loaded ' + allSpecies.length + ' species from backend');
+                    updateSpeciesGrid();
+                } else {
+                    throw new Error('Failed to load species');
+                }
+            } catch (error) {
+                log('Error loading species: ' + error.message);
+                // Fallback to local data
+                allSpecies = [
+                    { id: 'offline_1', name: 'Offline Species', emoji: '❓', rarity: 'common', discovered: false }
+                ];
+                updateSpeciesGrid();
+            }
+        }
+        
+        // Inspect cell using backend discovery service
+        async function inspectCell() {
+            if (game.cells < 1) {
+                log('Need at least 1 cell to inspect!');
+                return;
+            }
+            
+            if (!isConnected) {
+                log('Cannot inspect cell - no backend connection');
+                return;
+            }
+            
+            game.cells--;
+            updateDisplay();
+            
+            try {
+                log('Inspecting cell using backend discovery service...');
+                const response = await fetch(API_BASE + '/api/species/discover', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playerId: 'mobile_player',
+                        magnifyingGlass: game.magnifyingGlass > 0 ? { tier: 'common' } : null
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        const species = result.species;
+                        
+                        if (result.isNewDiscovery) {
+                            game.discoveredSpecies.push(species.id);
+                            log('🎉 NEW SPECIES! Discovered ' + species.rarity.toUpperCase() + ' ' + species.name + ' ' + species.emoji);
+                        } else {
+                            log('Found ' + species.rarity + ' ' + species.name + ' ' + species.emoji + ' (already discovered)');
+                        }
+                        
+                        // Update species data
+                        const speciesIndex = allSpecies.findIndex(s => s.id === species.id);
+                        if (speciesIndex >= 0) {
+                            allSpecies[speciesIndex].discovered = true;
+                        }
+                        
+                        updateSpeciesGrid();
+                        saveGame();
+                    } else {
+                        log('Discovery failed: ' + (result.error || 'Unknown error'));
+                    }
+                } else {
+                    throw new Error('Discovery request failed');
+                }
+            } catch (error) {
+                log('Error during discovery: ' + error.message);
+                // Refund the cell
+                game.cells++;
+                updateDisplay();
+            }
+        }
+        
+        // Add steps (same as before but with backend sync)
+        function addSteps() {
+            var oldSteps = game.steps;
+            game.steps += 100;
+            
+            if (game.mode === 'discovery') {
+                var oldCellsEarned = Math.floor(oldSteps / 1000);
+                var newCellsEarned = Math.floor(game.steps / 1000);
+                var cellsToAdd = newCellsEarned - oldCellsEarned;
+                
+                if (cellsToAdd > 0) {
+                    game.cells += cellsToAdd;
+                    log('Earned ' + cellsToAdd + ' cells!');
+                } else {
+                    var needed = 1000 - (game.steps % 1000);
+                    log(needed + ' more steps for next cell');
+                }
+            } else {
+                var oldExpEarned = Math.floor(oldSteps / 10);
+                var newExpEarned = Math.floor(game.steps / 10);
+                var expToAdd = newExpEarned - oldExpEarned;
+                
+                if (expToAdd > 0) {
+                    game.experience += expToAdd;
+                    log('Earned ' + expToAdd + ' experience!');
+                }
+            }
+            
+            checkMilestones();
+            updateDisplay();
+            saveGame();
+            
+            // Sync with backend if connected
+            if (isConnected) {
+                syncGameState();
+            }
+        }
+        
+        // Sync game state with backend
+        async function syncGameState() {
+            try {
+                await fetch(API_BASE + '/api/game/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playerId: 'mobile_player',
+                        steps: game.steps,
+                        cells: game.cells,
+                        experience: game.experience,
+                        mode: game.mode,
+                        discoveredSpecies: game.discoveredSpecies
+                    })
+                });
+            } catch (error) {
+                // Silent fail for sync
+                console.log('Sync failed:', error);
+            }
+        }
+        
+        // Toggle magnifying glass usage
+        function toggleMagnifyingGlass() {
+            if (game.magnifyingGlass < 1) {
+                log('No magnifying glasses available!');
+                return;
+            }
+            
+            useMagnifyingGlass = !useMagnifyingGlass;
+            var glassBtn = document.getElementById('glass-btn');
+            
+            if (useMagnifyingGlass) {
+                glassBtn.innerHTML = '🔍 Glass ON';
+                glassBtn.style.background = 'rgba(255, 193, 7, 0.8)';
+                log('Magnifying glass activated! Better discovery odds.');
+            } else {
+                glassBtn.innerHTML = 'Use 🔍 Glass';
+                glassBtn.style.background = 'rgba(255,255,255,0.2)';
+                log('Magnifying glass deactivated.');
+            }
+        }
+        
+        // View steplings
+        function viewSteplings() {
+            document.getElementById('species-section').style.display = 'none';
+            document.getElementById('steplings-section').style.display = 'block';
+            loadSteplings();
+        }
+        
+        // Hide steplings view
+        function hideSteplings() {
+            document.getElementById('steplings-section').style.display = 'none';
+            document.getElementById('species-section').style.display = 'block';
+        }
+        
+        // Load steplings from backend
+        async function loadSteplings() {
+            if (!isConnected) {
+                log('Cannot load steplings - no backend connection');
+                return;
+            }
+            
+            try {
+                log('Loading steplings from backend...');
+                const response = await fetch(API_BASE + '/api/steplings', {
+                    headers: {
+                        'Authorization': 'Bearer mock_token', // Mock auth for testing
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    playerSteplings = result.data || [];
+                    log('Loaded ' + playerSteplings.length + ' steplings');
+                    updateSteplingsGrid();
+                } else {
+                    throw new Error('Failed to load steplings');
+                }
+            } catch (error) {
+                log('Error loading steplings: ' + error.message);
+                // Mock some steplings for testing
+                playerSteplings = [
+                    { id: 'step_1', speciesId: 'common_001', level: 1, fusionLevel: 1, species: { name: 'Stepfoot', emoji: '🐛' } }
+                ];
+                updateSteplingsGrid();
+            }
+        }
+        
+        // Update steplings grid
+        function updateSteplingsGrid() {
+            var grid = document.getElementById('steplings-grid');
+            var html = '';
+            
+            if (playerSteplings.length === 0) {
+                html = '<div class="species-card">No steplings yet! Discover species to get steplings.</div>';
+            } else {
+                for (var i = 0; i < playerSteplings.length; i++) {
+                    var s = playerSteplings[i];
+                    var species = s.species || { name: 'Unknown', emoji: '❓' };
+                    html += '<div class="species-card" onclick="selectStepling(\'' + s.id + '\')">';
+                    html += '<div class="species-emoji">' + species.emoji + '</div>';
+                    html += '<div class="species-name">' + species.name + '</div>';
+                    html += '<div style="font-size: 10px;">Lv.' + s.level + ' F.' + s.fusionLevel + '</div>';
+                    html += '</div>';
+                }
+            }
+            
+            grid.innerHTML = html;
+        }
+        
+        // Select stepling for actions
+        function selectStepling(steplingId) {
+            var stepling = playerSteplings.find(s => s.id === steplingId);
+            if (stepling) {
+                var species = stepling.species || { name: 'Unknown' };
+                log('Selected ' + species.name + ' (Level ' + stepling.level + ', Fusion ' + stepling.fusionLevel + ')');
+                // TODO: Add fusion interface
+            }
+        }
+        
+        // Check milestones
+        function checkMilestones() {
+            var milestones = [5000, 10000, 50000, 100000];
+            for (var i = 0; i < milestones.length; i++) {
+                if (game.steps >= milestones[i] && game.magnifyingGlass <= i) {
+                    game.magnifyingGlass = i + 1;
+                    log('🎉 ' + milestones[i] + ' steps milestone! Earned magnifying glass!');
+                }
+            }
+        }
+        
+        // Update display
+        function updateDisplay() {
+            document.getElementById('step-count').innerHTML = game.steps;
+            document.getElementById('cells').innerHTML = game.cells;
+            document.getElementById('exp').innerHTML = game.experience;
+            document.getElementById('glass').innerHTML = game.magnifyingGlass;
+            
+            // Update mode
+            if (game.mode === 'discovery') {
+                document.getElementById('mode-title').innerHTML = '🔍 Discovery Mode';
+                document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell';
+            } else {
+                document.getElementById('mode-title').innerHTML = '💪 Training Mode';
+                document.getElementById('mode-desc').innerHTML = '10 steps = 1 experience';
+            }
+            
+            // Update inspect button
+            var inspectBtn = document.getElementById('inspect-btn');
+            if (game.cells >= 1 && isConnected) {
+                inspectBtn.innerHTML = 'Inspect Cell (' + game.cells + ')';
+                inspectBtn.disabled = false;
+                inspectBtn.style.opacity = '1';
+            } else if (!isConnected) {
+                inspectBtn.innerHTML = 'Need Backend';
+                inspectBtn.disabled = true;
+                inspectBtn.style.opacity = '0.5';
+            } else {
+                inspectBtn.innerHTML = 'Need 1 Cell';
+                inspectBtn.disabled = true;
+                inspectBtn.style.opacity = '0.5';
+            }
+        }
+        
+        // Update species grid
+        function updateSpeciesGrid() {
+            var grid = document.getElementById('species-grid');
+            var html = '';
+            
+            if (allSpecies.length === 0) {
+                html = '<div class="species-card">Loading species...</div>';
+            } else {
+                for (var i = 0; i < allSpecies.length; i++) {
+                    var s = allSpecies[i];
+                    var discovered = s.discovered || game.discoveredSpecies.indexOf(s.id) !== -1;
+                    html += '<div class="species-card rarity-' + s.rarity + '">';
+                    html += '<div class="species-emoji">' + (discovered ? s.emoji : '❓') + '</div>';
+                    html += '<div class="species-name">' + (discovered ? s.name : '???') + '</div>';
+                    html += '</div>';
+                }
+            }
+            
+            grid.innerHTML = html;
+        }
+        
+        // Save/load game
+        function saveGame() {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('stepScientistsConnected', JSON.stringify(game));
+            }
+        }
+        
+        function loadGame() {
+            if (typeof localStorage !== 'undefined') {
+                var saved = localStorage.getItem('stepScientistsConnected');
+                if (saved) {
+                    game = JSON.parse(saved);
+                    log('Game loaded from local storage');
+                }
+            }
+        }
+        
+        // Log function
+        function log(message) {
+            var logEl = document.getElementById('log');
+            var time = new Date().toLocaleTimeString();
+            logEl.innerHTML = '[' + time + '] ' + message;
+            console.log('[Step Scientists] ' + message);
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Step Scientists</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+        
+        .app-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .step-display {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .step-count {
+            font-size: 60px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .step-label {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        
+        .game-mode {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .mode-title {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .mode-description {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+        
+        .resources {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .resource {
+            background: rgba(255,255,255,0.15);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        
+        .resource-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .resource-label {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            padding: 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .btn-primary {
+            background: rgba(76, 175, 80, 0.8);
+        }
+        
+        .btn-secondary {
+            background: rgba(33, 150, 243, 0.8);
+        }
+        
+        .species-section {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 25px;
+        }
+        
+        .species-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .species-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .species-emoji {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+        
+        .species-name {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .debug {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🧪 Step Scientists</h1>
+        </div>
+        
+        <div class="step-display">
+            <div id="step-count" class="step-count">0</div>
+            <div class="step-label">Steps Today</div>
+        </div>
+        
+        <div class="game-mode">
+            <div id="mode-title" class="mode-title">🔍 Discovery Mode</div>
+            <div id="mode-description" class="mode-description">1000 steps = 1 cell</div>
+        </div>
+        
+        <div class="resources">
+            <div class="resource">
+                <div id="cells-count" class="resource-value">0</div>
+                <div class="resource-label">Cells</div>
+            </div>
+            <div class="resource">
+                <div id="experience-count" class="resource-value">0</div>
+                <div class="resource-label">Experience</div>
+            </div>
+            <div class="resource">
+                <div id="magnifying-glass-count" class="resource-value">0</div>
+                <div class="resource-label">🔍 Glass</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="addSteps()">+100 Steps</button>
+            <button class="btn btn-secondary" onclick="switchMode()">Switch Mode</button>
+            <button class="btn" onclick="inspectCell()" id="inspect-btn">Inspect Cell</button>
+            <button class="btn" onclick="resetGame()">Reset Game</button>
+        </div>
+        
+        <div class="species-section">
+            <div class="species-title">Species Collection</div>
+            <div id="species-grid" class="species-grid">
+                <!-- Species will be populated here -->
+            </div>
+        </div>
+        
+        <div id="debug" class="debug">App loaded successfully!</div>
+    </div>
+
+    <script>
+        // Game state
+        let game = {
+            steps: 0,
+            mode: 'discovery', // 'discovery' or 'training'
+            cells: 0,
+            experience: 0,
+            magnifyingGlass: 0,
+            discoveredSpecies: []
+        };
+        
+        // Species data
+        const species = [
+            { id: 1, name: 'Steppy', emoji: '🐛', rarity: 'common' },
+            { id: 2, name: 'Walkius', emoji: '🦎', rarity: 'common' },
+            { id: 3, name: 'Jogger', emoji: '🐸', rarity: 'uncommon' },
+            { id: 4, name: 'Sprinter', emoji: '🦘', rarity: 'rare' },
+            { id: 5, name: 'Marathon', emoji: '🦅', rarity: 'epic' },
+            { id: 6, name: 'Legendary', emoji: '🐉', rarity: 'legendary' }
+        ];
+        
+        // Initialize app
+        function init() {
+            loadGame();
+            updateDisplay();
+            log('Step Scientists loaded! Tap buttons to play.');
+        }
+        
+        // Add steps
+        function addSteps() {
+            game.steps += 100;
+            
+            if (game.mode === 'discovery') {
+                const newCells = Math.floor(game.steps / 1000) - game.cells;
+                if (newCells > 0) {
+                    game.cells += newCells;
+                    log(`+100 steps! Earned ${newCells} cells!`);
+                } else {
+                    const needed = 1000 - (game.steps % 1000);
+                    log(`+100 steps! ${needed} more for next cell.`);
+                }
+            } else {
+                const newExp = Math.floor(game.steps / 10) - game.experience;
+                if (newExp > 0) {
+                    game.experience += newExp;
+                    log(`+100 steps! Earned ${newExp} experience!`);
+                }
+            }
+            
+            checkMilestones();
+            updateDisplay();
+            saveGame();
+        }
+        
+        // Switch game mode
+        function switchMode() {
+            game.mode = game.mode === 'discovery' ? 'training' : 'discovery';
+            updateDisplay();
+            log(`Switched to ${game.mode} mode!`);
+            saveGame();
+        }
+        
+        // Inspect cell
+        function inspectCell() {
+            if (game.cells < 1) {
+                log('Need at least 1 cell to inspect!');
+                return;
+            }
+            
+            game.cells--;
+            
+            // Discovery roll
+            const roll = Math.random() * 100;
+            let found;
+            
+            if (roll < 40) found = 1;      // Common
+            else if (roll < 65) found = 2; // Common
+            else if (roll < 80) found = 3; // Uncommon
+            else if (roll < 92) found = 4; // Rare
+            else if (roll < 98) found = 5; // Epic
+            else found = 6;                // Legendary
+            
+            if (!game.discoveredSpecies.includes(found)) {
+                game.discoveredSpecies.push(found);
+                const s = species[found - 1];
+                log(`🎉 NEW SPECIES! Found ${s.name} ${s.emoji}`);
+            } else {
+                const s = species[found - 1];
+                log(`Found ${s.name} ${s.emoji} (already discovered)`);
+            }
+            
+            updateDisplay();
+            saveGame();
+        }
+        
+        // Check milestones
+        function checkMilestones() {
+            const milestones = [5000, 10000, 50000, 100000];
+            for (let i = 0; i < milestones.length; i++) {
+                if (game.steps >= milestones[i] && game.magnifyingGlass <= i) {
+                    game.magnifyingGlass = i + 1;
+                    log(`🎉 ${milestones[i]} steps milestone! Earned magnifying glass!`);
+                }
+            }
+        }
+        
+        // Reset game
+        function resetGame() {
+            if (confirm('Reset all progress?')) {
+                game = {
+                    steps: 0,
+                    mode: 'discovery',
+                    cells: 0,
+                    experience: 0,
+                    magnifyingGlass: 0,
+                    discoveredSpecies: []
+                };
+                updateDisplay();
+                saveGame();
+                log('Game reset!');
+            }
+        }
+        
+        // Update display
+        function updateDisplay() {
+            document.getElementById('step-count').textContent = game.steps;
+            document.getElementById('cells-count').textContent = game.cells;
+            document.getElementById('experience-count').textContent = game.experience;
+            document.getElementById('magnifying-glass-count').textContent = game.magnifyingGlass;
+            
+            // Update mode
+            const modeTitle = document.getElementById('mode-title');
+            const modeDesc = document.getElementById('mode-description');
+            
+            if (game.mode === 'discovery') {
+                modeTitle.textContent = '🔍 Discovery Mode';
+                modeDesc.textContent = '1000 steps = 1 cell';
+            } else {
+                modeTitle.textContent = '💪 Training Mode';
+                modeDesc.textContent = '10 steps = 1 experience';
+            }
+            
+            // Update inspect button
+            const inspectBtn = document.getElementById('inspect-btn');
+            if (game.cells >= 1) {
+                inspectBtn.textContent = 'Inspect Cell';
+                inspectBtn.style.opacity = '1';
+            } else {
+                inspectBtn.textContent = 'Need 1 Cell';
+                inspectBtn.style.opacity = '0.5';
+            }
+            
+            // Update species grid
+            updateSpeciesGrid();
+        }
+        
+        // Update species grid
+        function updateSpeciesGrid() {
+            const grid = document.getElementById('species-grid');
+            grid.innerHTML = species.map(s => {
+                const discovered = game.discoveredSpecies.includes(s.id);
+                return `
+                    <div class="species-card">
+                        <div class="species-emoji">${discovered ? s.emoji : '❓'}</div>
+                        <div class="species-name">${discovered ? s.name : '???'}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Save game
+        function saveGame() {
+            localStorage.setItem('stepScientists', JSON.stringify(game));
+        }
+        
+        // Load game
+        function loadGame() {
+            const saved = localStorage.getItem('stepScientists');
+            if (saved) {
+                game = JSON.parse(saved);
+                log('Game loaded from storage!');
+            }
+        }
+        
+        // Log message
+        function log(message) {
+            const debug = document.getElementById('debug');
+            const time = new Date().toLocaleTimeString();
+            debug.textContent = `[${time}] ${message}`;
+            console.log(message);
+        }
+        
+        // Start the app
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

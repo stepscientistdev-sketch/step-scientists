@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Basic Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-size: 24px; padding: 20px; background: #333; color: white; text-align: center; }
+        button { font-size: 30px; padding: 20px; margin: 20px; background: #4CAF50; color: white; border: none; border-radius: 10px; }
+        #result { font-size: 40px; margin: 30px; background: #666; padding: 20px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Basic Test</h1>
+    <div id="result">0</div>
+    <button onclick="clickMe()">Click Me!</button>
+    <div id="status">Loading...</div>
+
+    <script type="text/javascript">
+        var count = 0;
+        
+        function clickMe() {
+            count = count + 1;
+            document.getElementById('result').innerHTML = count;
+            document.getElementById('status').innerHTML = 'Clicked ' + count + ' times';
+        }
+        
+        // This should run immediately
+        document.getElementById('status').innerHTML = 'Ready!';
+    </script>
+</body>
+</html>

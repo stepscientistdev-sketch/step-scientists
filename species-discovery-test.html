@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Species Discovery System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .species-card {
+            border: 2px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .species-card.discovered {
+            border-color: #4CAF50;
+            background: #e8f5e8;
+        }
+        .rarity-common { border-left: 5px solid #808080; }
+        .rarity-uncommon { border-left: 5px solid #00ff00; }
+        .rarity-rare { border-left: 5px solid #0080ff; }
+        .rarity-epic { border-left: 5px solid #8000ff; }
+        .rarity-legendary { border-left: 5px solid #ff8000; }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .stat {
+            text-align: center;
+            padding: 5px;
+            background: #e0e0e0;
+            border-radius: 4px;
+        }
+        .discovery-controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-info { background: #17a2b8; color: white; }
+        
+        .discovery-result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 5px solid #007bff;
+            background: #f8f9fa;
+        }
+        .stepling-info {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .simulation-results {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .tier-result {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧬 Species Discovery System Test</h1>
+    
+    <div class="container">
+        <h2>📊 Species Database Status</h2>
+        <div id="database-status">Loading species database...</div>
+        <div id="species-grid" class="species-grid"></div>
+    </div>
+
+    <div class="container">
+        <h2>🔍 Discovery Testing</h2>
+        <div class="discovery-controls">
+            <button class="btn-primary" onclick="performDiscovery()">Discover Species</button>
+            <button class="btn-success" onclick="performDiscoveryWithGlass()">Discover with Magnifying Glass</button>
+            <button class="btn-warning" onclick="runSimulation()">Run 1000x Simulation</button>
+            <button class="btn-info" onclick="resetDatabase()">Reset Database</button>
+        </div>
+        <div id="discovery-results"></div>
+    </div>
+
+    <div class="container">
+        <h2>📈 Discovery Statistics</h2>
+        <div id="discovery-stats"></div>
+    </div>
+
+    <div class="container">
+        <h2>🎯 Simulation Results</h2>
+        <div id="simulation-results"></div>
+    </div>
+
+    <script>
+        // Mock AsyncStorage for browser environment
+        const mockStorage = {
+            data: {},
+            getItem: function(key) {
+                return Promise.resolve(this.data[key] || null);
+            },
+            setItem: function(key, value) {
+                this.data[key] = value;
+                return Promise.resolve();
+            },
+            removeItem: function(key) {
+                delete this.data[key];
+                return Promise.resolve();
+            }
+        };
+
+        // Species and Discovery System Implementation
+        const RarityTier = {
+            COMMON: 'COMMON',
+            UNCOMMON: 'UNCOMMON', 
+            RARE: 'RARE',
+            EPIC: 'EPIC',
+            LEGENDARY: 'LEGENDARY'
+        };
+
+        const INITIAL_SPECIES_DATA = [
+            // Common Tier
+            {
+                id: 'common_001',
+                name: 'Stepfoot',
+                description: 'A small, energetic creature that loves to walk.',
+                rarityTier: RarityTier.COMMON,
+                baseStats: { health: 25, attack: 15, defense: 10, special: 5 },
+                abilities: [{ id: 'quick_step', name: 'Quick Step', description: 'Increases movement speed', effect: 'speed_boost_small' }],
+                evolutionSprites: ['stepfoot_1.png', 'stepfoot_2.png', 'stepfoot_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            {
+                id: 'common_002',
+                name: 'Walkwing',
+                description: 'A bird-like creature with strong legs.',
+                rarityTier: RarityTier.COMMON,
+                baseStats: { health: 20, attack: 18, defense: 8, special: 9 },
+                abilities: [{ id: 'ground_peck', name: 'Ground Peck', description: 'A precise ground-based attack', effect: 'accuracy_boost' }],
+                evolutionSprites: ['walkwing_1.png', 'walkwing_2.png', 'walkwing_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            {
+                id: 'common_003',
+                name: 'Pacepal',
+                description: 'A friendly companion that matches your walking pace.',
+                rarityTier: RarityTier.COMMON,
+                baseStats: { health: 30, attack: 12, defense: 12, special: 6 },
+                abilities: [{ id: 'steady_pace', name: 'Steady Pace', description: 'Maintains consistent performance', effect: 'stamina_boost' }],
+                evolutionSprites: ['pacepal_1.png', 'pacepal_2.png', 'pacepal_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            // Uncommon Tier
+            {
+                id: 'uncommon_001',
+                name: 'Stridehorn',
+                description: 'A majestic creature with powerful legs and a spiraled horn.',
+                rarityTier: RarityTier.UNCOMMON,
+                baseStats: { health: 45, attack: 35, defense: 25, special: 15 },
+                abilities: [
+                    { id: 'horn_charge', name: 'Horn Charge', description: 'A powerful charging attack', effect: 'damage_boost_medium' },
+                    { id: 'graceful_stride', name: 'Graceful Stride', description: 'Elegant movement that boosts evasion', effect: 'evasion_boost' }
+                ],
+                evolutionSprites: ['stridehorn_1.png', 'stridehorn_2.png', 'stridehorn_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            {
+                id: 'uncommon_002',
+                name: 'Joggerfly',
+                description: 'A mystical insect that hovers while jogging in place.',
+                rarityTier: RarityTier.UNCOMMON,
+                baseStats: { health: 40, attack: 30, defense: 20, special: 30 },
+                abilities: [
+                    { id: 'hover_jog', name: 'Hover Jog', description: 'Maintains position while building energy', effect: 'energy_accumulation' },
+                    { id: 'wing_gust', name: 'Wing Gust', description: 'Creates powerful wind attacks', effect: 'special_attack_boost' }
+                ],
+                evolutionSprites: ['joggerfly_1.png', 'joggerfly_2.png', 'joggerfly_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            // Rare Tier
+            {
+                id: 'rare_001',
+                name: 'Marathonmane',
+                description: 'A legendary endurance runner with a flowing mane.',
+                rarityTier: RarityTier.RARE,
+                baseStats: { health: 80, attack: 60, defense: 50, special: 40 },
+                abilities: [
+                    { id: 'endless_endurance', name: 'Endless Endurance', description: 'Never loses stamina', effect: 'stamina_infinite' },
+                    { id: 'mane_whip', name: 'Mane Whip', description: 'Uses flowing mane as weapon', effect: 'damage_boost_large' },
+                    { id: 'runner_focus', name: 'Runner Focus', description: 'Intense concentration', effect: 'all_stats_boost' }
+                ],
+                evolutionSprites: ['marathonmane_1.png', 'marathonmane_2.png', 'marathonmane_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            {
+                id: 'rare_002',
+                name: 'Speedshadow',
+                description: 'A mysterious creature that moves so fast it appears as a shadow.',
+                rarityTier: RarityTier.RARE,
+                baseStats: { health: 70, attack: 75, defense: 40, special: 55 },
+                abilities: [
+                    { id: 'shadow_dash', name: 'Shadow Dash', description: 'Becomes untouchable', effect: 'evasion_perfect' },
+                    { id: 'speed_strike', name: 'Speed Strike', description: 'Lightning-fast attacks', effect: 'multi_hit_attack' },
+                    { id: 'blur_form', name: 'Blur Form', description: 'Becomes partially incorporeal', effect: 'defense_phase' }
+                ],
+                evolutionSprites: ['speedshadow_1.png', 'speedshadow_2.png', 'speedshadow_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            // Epic Tier
+            {
+                id: 'epic_001',
+                name: 'Titanstrider',
+                description: 'A colossal being whose every step shakes the earth.',
+                rarityTier: RarityTier.EPIC,
+                baseStats: { health: 150, attack: 120, defense: 100, special: 80 },
+                abilities: [
+                    { id: 'earth_shake', name: 'Earth Shake', description: 'Creates seismic waves', effect: 'area_damage_massive' },
+                    { id: 'titan_strength', name: 'Titan Strength', description: 'Overwhelming power', effect: 'attack_boost_massive' },
+                    { id: 'continental_stride', name: 'Continental Stride', description: 'Cross vast distances', effect: 'movement_teleport' },
+                    { id: 'ancient_wisdom', name: 'Ancient Wisdom', description: 'Millennia of knowledge', effect: 'special_boost_massive' }
+                ],
+                evolutionSprites: ['titanstrider_1.png', 'titanstrider_2.png', 'titanstrider_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            },
+            // Legendary Tier
+            {
+                id: 'legendary_001',
+                name: 'Stepmaster Supreme',
+                description: 'The ultimate walking companion, the first creature to ever take a step.',
+                rarityTier: RarityTier.LEGENDARY,
+                baseStats: { health: 250, attack: 200, defense: 180, special: 150 },
+                abilities: [
+                    { id: 'first_step', name: 'First Step', description: 'The original step', effect: 'reality_alter_movement' },
+                    { id: 'step_mastery', name: 'Step Mastery', description: 'Perfect locomotion control', effect: 'all_abilities_enhance' },
+                    { id: 'inspire_walkers', name: 'Inspire Walkers', description: 'Motivates all creatures', effect: 'team_boost_ultimate' },
+                    { id: 'eternal_journey', name: 'Eternal Journey', description: 'Endless exploration', effect: 'immortality_walking' },
+                    { id: 'step_dimension', name: 'Step Dimension', description: 'Access parallel dimensions', effect: 'dimension_control' }
+                ],
+                evolutionSprites: ['stepmaster_1.png', 'stepmaster_2.png', 'stepmaster_3.png'],
+                discoveryCount: 0,
+                isDiscovered: false
+            }
+        ];
+
+        // Species Service Implementation
+        class SpeciesService {
+            constructor() {
+                this.speciesDatabase = [];
+                this.discoveryData = new Map();
+                this.playerDiscoveries = new Set();
+            }
+
+            async initializeSpeciesDatabase() {
+                const existingData = await mockStorage.getItem('species_database');
+                if (existingData) {
+                    this.speciesDatabase = JSON.parse(existingData);
+                } else {
+                    this.speciesDatabase = [...INITIAL_SPECIES_DATA];
+                    await this.saveSpeciesDatabase();
+                }
+
+                const discoveryDataStr = await mockStorage.getItem('discovery_data');
+                if (discoveryDataStr) {
+                    const discoveryArray = JSON.parse(discoveryDataStr);
+                    this.discoveryData = new Map(discoveryArray.map(item => [
+                        item.speciesId,
+                        { ...item, lastDiscoveryDate: new Date(item.lastDiscoveryDate) }
+                    ]));
+                } else {
+                    this.initializeDiscoveryData();
+                }
+
+                const playerDiscoveriesStr = await mockStorage.getItem('player_discoveries');
+                if (playerDiscoveriesStr) {
+                    this.playerDiscoveries = new Set(JSON.parse(playerDiscoveriesStr));
+                }
+
+                console.log(`✅ Species database initialized with ${this.speciesDatabase.length} species`);
+            }
+
+            initializeDiscoveryData() {
+                this.speciesDatabase.forEach(species => {
+                    this.discoveryData.set(species.id, {
+                        speciesId: species.id,
+                        globalDiscoveryCount: 0,
+                        lastDiscoveryDate: new Date(),
+                        discoveryMultiplier: 1.0,
+                        isActive: true
+                    });
+                });
+                this.saveDiscoveryData();
+            }
+
+            async getSpeciesByRarity(rarity) {
+                return this.speciesDatabase.filter(species => 
+                    species.rarityTier === rarity && 
+                    this.discoveryData.get(species.id)?.isActive
+                );
+            }
+
+            async getDiscoveredSpecies() {
+                return this.speciesDatabase.filter(species => 
+                    this.playerDiscoveries.has(species.id)
+                );
+            }
+
+            async getUndiscoveredSpecies() {
+                return this.speciesDatabase.filter(species => 
+                    !this.playerDiscoveries.has(species.id) && 
+                    this.discoveryData.get(species.id)?.isActive
+                );
+            }
+
+            async getAllSpecies() {
+                return [...this.speciesDatabase];
+            }
+
+            async markSpeciesDiscovered(speciesId) {
+                this.playerDiscoveries.add(speciesId);
+                
+                const discoveryData = this.discoveryData.get(speciesId);
+                if (discoveryData) {
+                    discoveryData.globalDiscoveryCount += 1;
+                    discoveryData.lastDiscoveryDate = new Date();
+                }
+
+                const species = this.speciesDatabase.find(s => s.id === speciesId);
+                if (species) {
+                    species.isDiscovered = true;
+                    species.discoveryCount += 1;
+                }
+
+                await this.savePlayerDiscoveries();
+                await this.saveDiscoveryData();
+                await this.saveSpeciesDatabase();
+            }
+
+            async getDiscoveryData(speciesId) {
+                return this.discoveryData.get(speciesId) || null;
+            }
+
+            async saveSpeciesDatabase() {
+                await mockStorage.setItem('species_database', JSON.stringify(this.speciesDatabase));
+            }
+
+            async saveDiscoveryData() {
+                const discoveryArray = Array.from(this.discoveryData.values());
+                await mockStorage.setItem('discovery_data', JSON.stringify(discoveryArray));
+            }
+
+            async savePlayerDiscoveries() {
+                await mockStorage.setItem('player_discoveries', JSON.stringify(Array.from(this.playerDiscoveries)));
+            }
+
+            async resetDatabase() {
+                await mockStorage.removeItem('species_database');
+                await mockStorage.removeItem('discovery_data');
+                await mockStorage.removeItem('player_discoveries');
+                await this.initializeSpeciesDatabase();
+            }
+        }
+
+        // Discovery Service Implementation
+        class DiscoveryService {
+            constructor(speciesService) {
+                this.speciesService = speciesService;
+            }
+
+            async inspectCell(magnifyingGlass = null) {
+                try {
+                    const discoveryOdds = await this.calculateDiscoveryOdds(magnifyingGlass);
+                    
+                    if (!discoveryOdds.selectedSpecies) {
+                        return {
+                            success: false,
+                            isNewDiscovery: false,
+                            rarityTier: RarityTier.COMMON,
+                            advancementRolls: 0,
+                            error: 'No species available for discovery'
+                        };
+                    }
+
+                    const discoveredSpecies = await this.speciesService.getDiscoveredSpecies();
+                    const isNewDiscovery = !discoveredSpecies.some(s => s.id === discoveryOdds.selectedSpecies.id);
+
+                    const stepling = this.createSteplingFromSpecies(discoveryOdds.selectedSpecies);
+
+                    if (isNewDiscovery) {
+                        await this.speciesService.markSpeciesDiscovered(discoveryOdds.selectedSpecies.id);
+                    }
+
+                    return {
+                        success: true,
+                        species: discoveryOdds.selectedSpecies,
+                        stepling,
+                        isNewDiscovery,
+                        rarityTier: discoveryOdds.finalTier,
+                        advancementRolls: discoveryOdds.rollHistory.length,
+                        magnifyingGlassUsed: magnifyingGlass,
+                        rollHistory: discoveryOdds.rollHistory
+                    };
+
+                } catch (error) {
+                    console.error('Error during cell inspection:', error);
+                    return {
+                        success: false,
+                        isNewDiscovery: false,
+                        rarityTier: RarityTier.COMMON,
+                        advancementRolls: 0,
+                        error: error.message
+                    };
+                }
+            }
+
+            async calculateDiscoveryOdds(magnifyingGlass = null) {
+                let currentTier = RarityTier.COMMON;
+                const rollHistory = [];
+                let advancementRolls = 0;
+
+                while (advancementRolls < 10) {
+                    const roll = Math.floor(Math.random() * 100) + 1;
+                    rollHistory.push(roll);
+
+                    const shouldAdvance = this.shouldAdvanceTier(roll, currentTier, magnifyingGlass);
+                    
+                    if (!shouldAdvance) {
+                        break;
+                    }
+
+                    const nextTier = this.getNextRarityTier(currentTier);
+                    if (nextTier) {
+                        currentTier = nextTier;
+                        advancementRolls++;
+                    } else {
+                        break;
+                    }
+                }
+
+                const selectedSpecies = await this.selectSpeciesFromTier(currentTier);
+
+                return {
+                    baseTier: RarityTier.COMMON,
+                    finalTier: currentTier,
+                    advancementChance: this.getAdvancementChance(currentTier, magnifyingGlass),
+                    magnifyingGlassBonus: !!magnifyingGlass,
+                    selectedSpecies,
+                    rollHistory
+                };
+            }
+
+            shouldAdvanceTier(roll, currentTier, magnifyingGlass) {
+                if (magnifyingGlass && this.magnifyingGlassApplies(currentTier, magnifyingGlass)) {
+                    return roll >= 96; // 5% chance (96-100)
+                } else {
+                    return roll === 100; // 1% chance
+                }
+            }
+
+            magnifyingGlassApplies(currentTier, magnifyingGlass) {
+                const tierOrder = [RarityTier.COMMON, RarityTier.UNCOMMON, RarityTier.RARE, RarityTier.EPIC, RarityTier.LEGENDARY];
+                const currentTierIndex = tierOrder.indexOf(currentTier);
+                const glassTierIndex = tierOrder.indexOf(magnifyingGlass.tier);
+                return currentTierIndex <= glassTierIndex;
+            }
+
+            getNextRarityTier(currentTier) {
+                switch (currentTier) {
+                    case RarityTier.COMMON: return RarityTier.UNCOMMON;
+                    case RarityTier.UNCOMMON: return RarityTier.RARE;
+                    case RarityTier.RARE: return RarityTier.EPIC;
+                    case RarityTier.EPIC: return RarityTier.LEGENDARY;
+                    case RarityTier.LEGENDARY: return null;
+                    default: return null;
+                }
+            }
+
+            getAdvancementChance(tier, magnifyingGlass) {
+                if (magnifyingGlass && this.magnifyingGlassApplies(tier, magnifyingGlass)) {
+                    return 0.05; // 5%
+                } else {
+                    return 0.01; // 1%
+                }
+            }
+
+            async selectSpeciesFromTier(tier) {
+                const speciesInTier = await this.speciesService.getSpeciesByRarity(tier);
+                
+                if (speciesInTier.length === 0) {
+                    return null;
+                }
+
+                const undiscoveredSpecies = await this.speciesService.getUndiscoveredSpecies();
+                const undiscoveredInTier = speciesInTier.filter(species => 
+                    undiscoveredSpecies.some(undiscovered => undiscovered.id === species.id)
+                );
+
+                const candidateSpecies = undiscoveredInTier.length > 0 ? undiscoveredInTier : speciesInTier;
+                
+                // Simple random selection for this test
+                return candidateSpecies[Math.floor(Math.random() * candidateSpecies.length)];
+            }
+
+            createSteplingFromSpecies(species) {
+                const steplingId = `stepling_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                
+                return {
+                    id: steplingId,
+                    playerId: 'test_player',
+                    speciesId: species.id,
+                    level: 1,
+                    fusionLevel: 1,
+                    currentStats: { ...species.baseStats },
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+            }
+
+            async simulateDiscovery(iterations, magnifyingGlass = null) {
+                const results = {
+                    [RarityTier.COMMON]: 0,
+                    [RarityTier.UNCOMMON]: 0,
+                    [RarityTier.RARE]: 0,
+                    [RarityTier.EPIC]: 0,
+                    [RarityTier.LEGENDARY]: 0
+                };
+
+                let totalAdvancementRolls = 0;
+
+                for (let i = 0; i < iterations; i++) {
+                    const odds = await this.calculateDiscoveryOdds(magnifyingGlass);
+                    results[odds.finalTier]++;
+                    totalAdvancementRolls += odds.rollHistory.length;
+                }
+
+                return {
+                    results,
+                    averageAdvancementRolls: totalAdvancementRolls / iterations,
+                    totalIterations: iterations
+                };
+            }
+        }
+
+        // Initialize services
+        const speciesService = new SpeciesService();
+        const discoveryService = new DiscoveryService(speciesService);
+
+        // UI Functions
+        async function initializeTest() {
+            await speciesService.initializeSpeciesDatabase();
+            await updateDisplay();
+        }
+
+        async function updateDisplay() {
+            await updateSpeciesGrid();
+            await updateDiscoveryStats();
+        }
+
+        async function updateSpeciesGrid() {
+            const allSpecies = await speciesService.getAllSpecies();
+            const discoveredSpecies = await speciesService.getDiscoveredSpecies();
+            const discoveredIds = new Set(discoveredSpecies.map(s => s.id));
+
+            const grid = document.getElementById('species-grid');
+            grid.innerHTML = '';
+
+            allSpecies.forEach(species => {
+                const isDiscovered = discoveredIds.has(species.id);
+                const card = document.createElement('div');
+                card.className = `species-card rarity-${species.rarityTier.toLowerCase()} ${isDiscovered ? 'discovered' : ''}`;
+                
+                card.innerHTML = `
+                    <h3>${species.name} ${isDiscovered ? '✅' : '❓'}</h3>
+                    <p><strong>Rarity:</strong> ${species.rarityTier}</p>
+                    <p>${species.description}</p>
+                    <div class="stats">
+                        <div class="stat">
+                            <div>HP</div>
+                            <div>${species.baseStats.health}</div>
+                        </div>
+                        <div class="stat">
+                            <div>ATK</div>
+                            <div>${species.baseStats.attack}</div>
+                        </div>
+                        <div class="stat">
+                            <div>DEF</div>
+                            <div>${species.baseStats.defense}</div>
+                        </div>
+                        <div class="stat">
+                            <div>SPL</div>
+                            <div>${species.baseStats.special}</div>
+                        </div>
+                    </div>
+                    <p><strong>Abilities:</strong> ${species.abilities.map(a => a.name).join(', ')}</p>
+                    <p><strong>Discovery Count:</strong> ${species.discoveryCount}</p>
+                `;
+                
+                grid.appendChild(card);
+            });
+
+            // Update database status
+            const statusDiv = document.getElementById('database-status');
+            statusDiv.innerHTML = `
+                <p><strong>Total Species:</strong> ${allSpecies.length}</p>
+                <p><strong>Discovered:</strong> ${discoveredSpecies.length} (${((discoveredSpecies.length / allSpecies.length) * 100).toFixed(1)}%)</p>
+                <p><strong>Undiscovered:</strong> ${allSpecies.length - discoveredSpecies.length}</p>
+            `;
+        }
+
+        async function updateDiscoveryStats() {
+            const allSpecies = await speciesService.getAllSpecies();
+            const discoveredSpecies = await speciesService.getDiscoveredSpecies();
+            
+            const statsByRarity = {};
+            Object.values(RarityTier).forEach(tier => {
+                const totalInTier = allSpecies.filter(s => s.rarityTier === tier).length;
+                const discoveredInTier = discoveredSpecies.filter(s => s.rarityTier === tier).length;
+                statsByRarity[tier] = { total: totalInTier, discovered: discoveredInTier };
+            });
+
+            const statsDiv = document.getElementById('discovery-stats');
+            let statsHtml = '<div class="species-grid">';
+            
+            Object.entries(statsByRarity).forEach(([tier, stats]) => {
+                const percentage = stats.total > 0 ? (stats.discovered / stats.total * 100).toFixed(1) : 0;
+                statsHtml += `
+                    <div class="species-card rarity-${tier.toLowerCase()}">
+                        <h4>${tier}</h4>
+                        <p>${stats.discovered} / ${stats.total} discovered</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <p>${percentage}% complete</p>
+                    </div>
+                `;
+            });
+            
+            statsHtml += '</div>';
+            statsDiv.innerHTML = statsHtml;
+        }
+
+        async function performDiscovery() {
+            const result = await discoveryService.inspectCell();
+            displayDiscoveryResult(result);
+            await updateDisplay();
+        }
+
+        async function performDiscoveryWithGlass() {
+            const magnifyingGlass = {
+                id: 'test_glass',
+                tier: RarityTier.RARE,
+                count: 1
+            };
+            const result = await discoveryService.inspectCell(magnifyingGlass);
+            displayDiscoveryResult(result);
+            await updateDisplay();
+        }
+
+        function displayDiscoveryResult(result) {
+            const resultsDiv = document.getElementById('discovery-results');
+            
+            if (!result.success) {
+                resultsDiv.innerHTML = `
+                    <div class="discovery-result" style="border-left-color: #dc3545;">
+                        <h4>❌ Discovery Failed</h4>
+                        <p><strong>Error:</strong> ${result.error}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const newDiscoveryBadge = result.isNewDiscovery ? '🆕 NEW DISCOVERY!' : '🔄 Already Discovered';
+            const glassUsed = result.magnifyingGlassUsed ? `🔍 Magnifying Glass (${result.magnifyingGlassUsed.tier})` : '👁️ Normal Vision';
+            
+            resultsDiv.innerHTML = `
+                <div class="discovery-result rarity-${result.rarityTier.toLowerCase()}">
+                    <h4>${newDiscoveryBadge}</h4>
+                    <h3>🧬 ${result.species.name}</h3>
+                    <p><strong>Rarity:</strong> ${result.rarityTier}</p>
+                    <p><strong>Method:</strong> ${glassUsed}</p>
+                    <p><strong>Advancement Rolls:</strong> ${result.advancementRolls}</p>
+                    <p><strong>Roll History:</strong> [${result.rollHistory.join(', ')}]</p>
+                    <p>${result.species.description}</p>
+                    
+                    <div class="stepling-info">
+                        <h4>🐾 Created Stepling</h4>
+                        <p><strong>ID:</strong> ${result.stepling.id}</p>
+                        <p><strong>Level:</strong> ${result.stepling.level}</p>
+                        <p><strong>Fusion Level:</strong> ${result.stepling.fusionLevel}</p>
+                        <div class="stats">
+                            <div class="stat">HP: ${result.stepling.currentStats.health}</div>
+                            <div class="stat">ATK: ${result.stepling.currentStats.attack}</div>
+                            <div class="stat">DEF: ${result.stepling.currentStats.defense}</div>
+                            <div class="stat">SPL: ${result.stepling.currentStats.special}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function runSimulation() {
+            const resultsDiv = document.getElementById('simulation-results');
+            resultsDiv.innerHTML = '<p>Running 1000x simulation...</p>';
+
+            const normalResults = await discoveryService.simulateDiscovery(1000);
+            const glassResults = await discoveryService.simulateDiscovery(1000, {
+                id: 'sim_glass',
+                tier: RarityTier.RARE,
+                count: 1
+            });
+
+            const colors = {
+                [RarityTier.COMMON]: '#808080',
+                [RarityTier.UNCOMMON]: '#00ff00', 
+                [RarityTier.RARE]: '#0080ff',
+                [RarityTier.EPIC]: '#8000ff',
+                [RarityTier.LEGENDARY]: '#ff8000'
+            };
+
+            let html = '<h3>Normal Discovery (1000 attempts)</h3><div class="simulation-results">';
+            Object.entries(normalResults.results).forEach(([tier, count]) => {
+                const percentage = (count / 1000 * 100).toFixed(1);
+                html += `
+                    <div class="tier-result" style="background-color: ${colors[tier]}">
+                        <div>${tier}</div>
+                        <div>${count}</div>
+                        <div>${percentage}%</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            html += '<h3>With Magnifying Glass (1000 attempts)</h3><div class="simulation-results">';
+            Object.entries(glassResults.results).forEach(([tier, count]) => {
+                const percentage = (count / 1000 * 100).toFixed(1);
+                html += `
+                    <div class="tier-result" style="background-color: ${colors[tier]}">
+                        <div>${tier}</div>
+                        <div>${count}</div>
+                        <div>${percentage}%</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            html += `
+                <h3>Comparison</h3>
+                <p><strong>Normal Average Rolls:</strong> ${normalResults.averageAdvancementRolls.toFixed(2)}</p>
+                <p><strong>With Glass Average Rolls:</strong> ${glassResults.averageAdvancementRolls.toFixed(2)}</p>
+                <p><strong>Higher Tier Rate (Normal):</strong> ${(((1000 - normalResults.results[RarityTier.COMMON]) / 1000) * 100).toFixed(1)}%</p>
+                <p><strong>Higher Tier Rate (Glass):</strong> ${(((1000 - glassResults.results[RarityTier.COMMON]) / 1000) * 100).toFixed(1)}%</p>
+            `;
+
+            resultsDiv.innerHTML = html;
+        }
+
+        async function resetDatabase() {
+            await speciesService.resetDatabase();
+            await updateDisplay();
+            document.getElementById('discovery-results').innerHTML = '';
+            document.getElementById('simulation-results').innerHTML = '';
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', initializeTest);
+    </script>
+</body>
+</html>

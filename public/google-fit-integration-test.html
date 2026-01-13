@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step Scientists - Google Fit Integration Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .steps {
+            font-size: 3em;
+            font-weight: bold;
+            text-align: center;
+            margin: 30px 0;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .config {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        .error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .success {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid rgba(0, 255, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚶‍♂️ Step Scientists</h1>
+        <h2 style="text-align: center; margin-bottom: 30px;">Google Fit Integration Test</h2>
+        
+        <div class="status" id="status">
+            Initializing Step Counter Service...
+        </div>
+
+        <div id="authSection">
+            <button onclick="requestPermission()" id="permissionBtn">
+                🔐 Request Google Fit Permission
+            </button>
+        </div>
+
+        <div id="dataSection" style="display: none;">
+            <div class="steps" id="stepCount">
+                0 steps
+            </div>
+            
+            <button onclick="getCurrentSteps()" id="refreshBtn">
+                🔄 Refresh Steps
+            </button>
+            
+            <button onclick="getStepHistory()" id="historyBtn">
+                📊 Get 7-Day History
+            </button>
+            
+            <button onclick="getStatus()" id="statusBtn">
+                ℹ️ Get Status
+            </button>
+        </div>
+
+        <div class="config">
+            <strong>Integration Status:</strong><br>
+            <div id="integrationStatus">Loading...</div>
+        </div>
+
+        <div id="errorDiv" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        // Import the step counter service (simulated for web)
+        // In a real React app, this would be imported properly
+        
+        let stepCounterService = null;
+        
+        // Initialize the service
+        async function initializeService() {
+            try {
+                updateStatus('Initializing Google Fit Web Service...');
+                
+                // Simulate the step counter service initialization
+                // This would normally be imported from your service
+                stepCounterService = {
+                    initialized: false,
+                    
+                    async initialize() {
+                        // Load Google Identity Services
+                        if (!window.google?.accounts) {
+                            await loadScript('https://accounts.google.com/gsi/client');
+                        }
+                        if (!window.gapi) {
+                            await loadScript('https://apis.google.com/js/api.js');
+                        }
+                        
+                        this.initialized = true;
+                        return true;
+                    },
+                    
+                    async requestPermission() {
+                        if (!this.initialized) {
+                            await this.initialize();
+                        }
+                        
+                        // Initialize Google Fit Web Service
+                        const CLIENT_ID = '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com';
+                        const SCOPES = 'https://www.googleapis.com/auth/fitness.activity.read';
+                        
+                        return new Promise((resolve) => {
+                            const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                                client_id: CLIENT_ID,
+                                scope: SCOPES,
+                                callback: (tokenResponse) => {
+                                    this.accessToken = tokenResponse.access_token;
+                                    resolve(true);
+                                },
+                            });
+                            
+                            tokenClient.requestAccessToken();
+                        });
+                    },
+                    
+                    async getCurrentSteps() {
+                        if (!this.accessToken) {
+                            throw new Error('Not authorized');
+                        }
+                        
+                        const today = new Date();
+                        const startOfDay = new Date(today);
+                        startOfDay.setHours(0, 0, 0, 0);
+                        
+                        const endOfDay = new Date(today);
+                        endOfDay.setHours(23, 59, 59, 999);
+
+                        const request = {
+                            aggregateBy: [{
+                                dataTypeName: 'com.google.step_count.delta'
+                            }],
+                            bucketByTime: { durationMillis: 86400000 },
+                            startTimeMillis: startOfDay.getTime(),
+                            endTimeMillis: endOfDay.getTime()
+                        };
+
+                        const response = await window.gapi.client.request({
+                            path: 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+                            method: 'POST',
+                            body: request,
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        let totalSteps = 0;
+                        if (response.result.bucket && response.result.bucket.length > 0) {
+                            response.result.bucket.forEach(bucket => {
+                                if (bucket.dataset && bucket.dataset.length > 0) {
+                                    bucket.dataset.forEach(dataset => {
+                                        if (dataset.point && dataset.point.length > 0) {
+                                            dataset.point.forEach(point => {
+                                                if (point.value && point.value.length > 0) {
+                                                    totalSteps += point.value[0].intVal || 0;
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        return totalSteps;
+                    }
+                };
+                
+                await stepCounterService.initialize();
+                
+                // Initialize gapi client
+                await new Promise((resolve) => {
+                    window.gapi.load('client', async () => {
+                        await window.gapi.client.init({
+                            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/fitness/v1/rest'],
+                        });
+                        resolve();
+                    });
+                });
+                
+                updateStatus('✅ Step Counter Service initialized successfully!');
+                updateIntegrationStatus('Ready - Click "Request Permission" to connect to Google Fit');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('Failed to initialize: ' + error.message);
+            }
+        }
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.defer = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        window.requestPermission = async function() {
+            try {
+                updateStatus('Requesting Google Fit permission...');
+                const granted = await stepCounterService.requestPermission();
+                
+                if (granted) {
+                    updateStatus('✅ Permission granted! You can now get step data.');
+                    showDataSection();
+                    updateIntegrationStatus('Connected to Google Fit');
+                    await getCurrentSteps();
+                } else {
+                    showError('Permission denied');
+                }
+            } catch (error) {
+                console.error('Permission error:', error);
+                showError('Permission request failed: ' + error.message);
+            }
+        }
+
+        window.getCurrentSteps = async function() {
+            try {
+                updateStatus('Getting current steps...');
+                const steps = await stepCounterService.getCurrentSteps();
+                
+                document.getElementById('stepCount').textContent = `${steps.toLocaleString()} steps`;
+                updateStatus(`✅ Retrieved ${steps} steps for today!`);
+                
+                if (steps === 0) {
+                    updateStatus('No step data found. Try walking around and refresh!');
+                }
+            } catch (error) {
+                console.error('Error getting steps:', error);
+                showError('Failed to get steps: ' + error.message);
+            }
+        }
+
+        window.getStepHistory = async function() {
+            try {
+                updateStatus('Getting 7-day step history...');
+                // This would call stepCounterService.getStepHistory(7) in the real implementation
+                updateStatus('Step history feature coming soon!');
+            } catch (error) {
+                console.error('Error getting history:', error);
+                showError('Failed to get step history: ' + error.message);
+            }
+        }
+
+        window.getStatus = async function() {
+            try {
+                updateStatus('Getting service status...');
+                // This would call stepCounterService.getGoogleFitStatus() in the real implementation
+                updateIntegrationStatus('Web Environment - Google Fit Web Service Active');
+                updateStatus('✅ Status retrieved successfully!');
+            } catch (error) {
+                console.error('Error getting status:', error);
+                showError('Failed to get status: ' + error.message);
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        function updateIntegrationStatus(message) {
+            document.getElementById('integrationStatus').textContent = message;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorDiv');
+            errorDiv.innerHTML = `<div class="error">❌ ${message}</div>`;
+            errorDiv.style.display = 'block';
+        }
+
+        function showSuccess(message) {
+            const errorDiv = document.getElementById('errorDiv');
+            errorDiv.innerHTML = `<div class="success">✅ ${message}</div>`;
+            errorDiv.style.display = 'block';
+        }
+
+        function showDataSection() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('dataSection').style.display = 'block';
+        }
+
+        // Initialize when page loads
+        window.onload = function() {
+            setTimeout(initializeService, 1000);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step Monsters - Game Mode Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #2c3e50;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: #3498db;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            margin: 15px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .step-count {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .status {
+            font-size: 14px;
+            color: #27ae60;
+            margin-top: 10px;
+        }
+        
+        .current-mode {
+            font-size: 16px;
+            color: #3498db;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+        
+        .mode-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .mode-button {
+            flex: 1;
+            background: #ecf0f1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.2s;
+        }
+        
+        .mode-button.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .mode-button:hover {
+            opacity: 0.8;
+        }
+        
+        .mode-button-text {
+            font-size: 14px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .mode-description {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .mode-button.active .mode-description {
+            color: rgba(255,255,255,0.8);
+        }
+        
+        .resource-row {
+            display: flex;
+            justify-content: space-around;
+        }
+        
+        .resource-text {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .action-button {
+            background: #3498db;
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .action-button:hover {
+            background: #2980b9;
+        }
+        
+        .milestone-list {
+            margin-top: 15px;
+        }
+        
+        .milestone-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .milestone-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .milestone-threshold {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #3498db;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-align: right;
+        }
+        
+        .inventory-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .inventory-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .inventory-item {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .footer {
+            margin: 15px;
+            padding: 15px;
+            background: #34495e;
+            color: #ecf0f1;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚶‍♂️ Step Monsters Test</h1>
+            <p>Game Mode System Demo</p>
+        </div>
+
+        <!-- Step Counter -->
+        <div class="card">
+            <div class="card-title">Step Counter</div>
+            <div class="step-count">Total Steps: <span id="totalSteps">0</span></div>
+            <div class="step-count">Steps in <span id="currentModeText">Discovery</span>: <span id="stepsInMode">0</span></div>
+            <div class="status">🟢 Simulated step tracking active</div>
+        </div>
+
+        <!-- Game Mode Selection -->
+        <div class="card">
+            <div class="card-title">Game Mode</div>
+            <div class="current-mode">Current: <span id="modeDisplay">Discovery</span></div>
+            
+            <div class="mode-buttons">
+                <button class="mode-button active" id="discoveryBtn" onclick="switchMode('discovery')">
+                    <span class="mode-button-text">Discovery Mode</span>
+                    <span class="mode-description">1000 steps = 1 cell</span>
+                </button>
+                <button class="mode-button" id="trainingBtn" onclick="switchMode('training')">
+                    <span class="mode-button-text">Training Mode</span>
+                    <span class="mode-description">10 steps = 1 XP</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Resources -->
+        <div class="card">
+            <div class="card-title">Resources</div>
+            <div class="resource-row">
+                <div class="resource-text">Cells: <span id="cells">0</span></div>
+                <div class="resource-text">XP: <span id="xp">0</span></div>
+            </div>
+        </div>
+
+        <!-- Milestones -->
+        <div class="card">
+            <div class="card-title">Milestones & Inventory</div>
+            <button class="action-button" onclick="toggleMilestones()">
+                <span id="milestoneToggleText">Show Milestone Progress</span>
+            </button>
+
+            <div id="milestoneList" class="milestone-list hidden">
+                <div class="milestone-item">
+                    <div class="milestone-name">Uncommon Magnifying Glass</div>
+                    <div class="milestone-threshold">5,000 steps</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress5000" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text"><span id="progressText5000">0%</span> <span id="status5000">🔒</span></div>
+                </div>
+
+                <div class="milestone-item">
+                    <div class="milestone-name">Rare Magnifying Glass</div>
+                    <div class="milestone-threshold">10,000 steps</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress10000" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text"><span id="progressText10000">0%</span> <span id="status10000">🔒</span></div>
+                </div>
+
+                <div class="milestone-item">
+                    <div class="milestone-name">Epic Magnifying Glass</div>
+                    <div class="milestone-threshold">50,000 steps</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress50000" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text"><span id="progressText50000">0%</span> <span id="status50000">🔒</span></div>
+                </div>
+
+                <div class="milestone-item">
+                    <div class="milestone-name">Legendary Magnifying Glass</div>
+                    <div class="milestone-threshold">100,000 steps</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress100000" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text"><span id="progressText100000">0%</span> <span id="status100000">🔒</span></div>
+                </div>
+            </div>
+
+            <div class="inventory-section">
+                <div class="inventory-title">🔍 Magnifying Glasses: <span id="glassCount">0</span></div>
+                <div id="inventoryItems"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            This demo simulates the game mode system with automatic step counting.
+            Switch modes to see different resource conversion rates!
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            currentMode: 'discovery',
+            totalSteps: 0,
+            stepsInMode: 0,
+            resources: { cells: 0, xp: 0 },
+            magnifyingGlasses: [],
+            milestones: {
+                5000: { reached: false, name: 'Uncommon Magnifying Glass' },
+                10000: { reached: false, name: 'Rare Magnifying Glass' },
+                50000: { reached: false, name: 'Epic Magnifying Glass' },
+                100000: { reached: false, name: 'Legendary Magnifying Glass' }
+            }
+        };
+
+        // Conversion rates
+        const CONVERSION_RATES = {
+            discovery: { stepsPerCell: 1000 },
+            training: { stepsPerXP: 10 }
+        };
+
+        // Update display
+        function updateDisplay() {
+            document.getElementById('totalSteps').textContent = gameState.totalSteps.toLocaleString();
+            document.getElementById('stepsInMode').textContent = gameState.stepsInMode.toLocaleString();
+            document.getElementById('currentModeText').textContent = gameState.currentMode === 'discovery' ? 'Discovery' : 'Training';
+            document.getElementById('modeDisplay').textContent = gameState.currentMode === 'discovery' ? 'Discovery' : 'Training';
+            document.getElementById('cells').textContent = gameState.resources.cells;
+            document.getElementById('xp').textContent = gameState.resources.xp;
+            document.getElementById('glassCount').textContent = gameState.magnifyingGlasses.length;
+
+            // Update milestone progress
+            Object.keys(gameState.milestones).forEach(threshold => {
+                const progress = Math.min(gameState.totalSteps / parseInt(threshold), 1);
+                const progressPercent = Math.round(progress * 100);
+                
+                document.getElementById(`progress${threshold}`).style.width = `${progressPercent}%`;
+                document.getElementById(`progressText${threshold}`).textContent = `${progressPercent}%`;
+                
+                if (gameState.milestones[threshold].reached) {
+                    document.getElementById(`status${threshold}`).textContent = '✅';
+                } else {
+                    document.getElementById(`status${threshold}`).textContent = '🔒';
+                }
+            });
+
+            // Update inventory
+            const inventoryDiv = document.getElementById('inventoryItems');
+            inventoryDiv.innerHTML = '';
+            gameState.magnifyingGlasses.forEach(glass => {
+                const item = document.createElement('div');
+                item.className = 'inventory-item';
+                item.textContent = `• ${glass}`;
+                inventoryDiv.appendChild(item);
+            });
+        }
+
+        // Switch game mode
+        function switchMode(mode) {
+            if (mode === gameState.currentMode) return;
+
+            const modeText = mode === 'discovery' ? 'Discovery' : 'Training';
+            const description = mode === 'discovery' 
+                ? 'Discovery Mode: 1000 steps = 1 cell for discovering new steplings'
+                : 'Training Mode: 10 steps = 1 XP for training your steplings';
+
+            if (confirm(`Switch to ${modeText} Mode?\n\n${description}`)) {
+                gameState.currentMode = mode;
+                gameState.stepsInMode = 0; // Reset steps in new mode
+
+                // Update button states
+                document.getElementById('discoveryBtn').classList.toggle('active', mode === 'discovery');
+                document.getElementById('trainingBtn').classList.toggle('active', mode === 'training');
+
+                updateDisplay();
+                alert(`Mode Switched!\nYou are now in ${modeText} Mode`);
+            }
+        }
+
+        // Toggle milestone display
+        function toggleMilestones() {
+            const milestoneList = document.getElementById('milestoneList');
+            const toggleText = document.getElementById('milestoneToggleText');
+            
+            if (milestoneList.classList.contains('hidden')) {
+                milestoneList.classList.remove('hidden');
+                toggleText.textContent = 'Hide Milestone Progress';
+            } else {
+                milestoneList.classList.add('hidden');
+                toggleText.textContent = 'Show Milestone Progress';
+            }
+        }
+
+        // Simulate step counting
+        function simulateSteps() {
+            const increment = Math.floor(Math.random() * 50) + 10; // 10-60 steps per update
+            const previousTotal = gameState.totalSteps;
+            const previousStepsInMode = gameState.stepsInMode;
+            
+            gameState.totalSteps += increment;
+            gameState.stepsInMode += increment;
+
+            // Calculate resources based on cumulative steps in current mode
+            if (gameState.currentMode === 'discovery') {
+                const previousCells = Math.floor(previousStepsInMode / CONVERSION_RATES.discovery.stepsPerCell);
+                const newCells = Math.floor(gameState.stepsInMode / CONVERSION_RATES.discovery.stepsPerCell);
+                const cellsEarned = newCells - previousCells;
+                gameState.resources.cells += cellsEarned;
+            } else {
+                const previousXP = Math.floor(previousStepsInMode / CONVERSION_RATES.training.stepsPerXP);
+                const newXP = Math.floor(gameState.stepsInMode / CONVERSION_RATES.training.stepsPerXP);
+                const xpEarned = newXP - previousXP;
+                gameState.resources.xp += xpEarned;
+            }
+
+            // Check milestones
+            Object.keys(gameState.milestones).forEach(threshold => {
+                const thresholdNum = parseInt(threshold);
+                if (previousTotal < thresholdNum && gameState.totalSteps >= thresholdNum && !gameState.milestones[threshold].reached) {
+                    gameState.milestones[threshold].reached = true;
+                    gameState.magnifyingGlasses.push(gameState.milestones[threshold].name);
+                    
+                    alert(`🎉 Milestone Reached!\nCongratulations! You've earned a ${gameState.milestones[threshold].name}!`);
+                }
+            });
+
+            updateDisplay();
+        }
+
+        // Start simulation
+        setInterval(simulateSteps, 3000); // Update every 3 seconds
+
+        // Initial display update
+        updateDisplay();
+    </script>
+</body>
+</html>
