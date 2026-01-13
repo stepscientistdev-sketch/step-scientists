@@ -568,6 +568,16 @@ async function startServer() {
     await database.raw('SELECT 1');
     console.log('✅ Database connection established');
 
+    // Run migrations
+    console.log('🔄 Running database migrations...');
+    await database.migrate.latest();
+    console.log('✅ Database migrations completed');
+
+    // Run seeds
+    console.log('🌱 Running database seeds...');
+    await database.seed.run();
+    console.log('✅ Database seeds completed');
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);

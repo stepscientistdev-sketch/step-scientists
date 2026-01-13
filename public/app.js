@@ -1,7 +1,7 @@
 // Detect environment and set appropriate API base
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://192.168.1.111:3000'  // Local development
-    : 'https://step-scientists-backend-production.up.railway.app'; // Production Railway URL (update this after deployment)
+    : 'https://step-scientists-backend.onrender.com'; // Production Render URL
 
 var game = {
     steps: 5000,
