@@ -158,7 +158,9 @@ app.post('/debug/create-mobile-player', async (req, res) => {
     });
   }
 });
+
 // Debug endpoint to inspect database state
+app.get('/debug/database', async (req, res) => {
   try {
     const playerId = MOBILE_PLAYER_ID;
     
