@@ -1670,13 +1670,6 @@ function toggleAchievementDetails() {
             detailsEl.style.display = 'none';
         }
     }
-}radius: 10px; height: 8px; overflow: hidden;">';
-        html += '<div style="background: ' + tierColor + '; height: 100%; width: ' + p.progressPercent.toFixed(1) + '%; transition: width 0.3s ease;"></div>';
-        html += '</div>';
-        html += '</div>';
-    }
-    
-    container.innerHTML = html;
 }
 
 // Get total magnifying glasses
