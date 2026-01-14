@@ -3,6 +3,8 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.hos
     ? 'http://192.168.1.111:3000'  // Local development
     : 'https://step-scientists-backend.onrender.com'; // Production Render URL
 
+const MOBILE_PLAYER_ID = '021cb11f-482a-44d2-b289-110400f23562'; // Hardcoded player ID for now
+
 var game = {
     steps: 5000, // Keep for backward compatibility - will become total lifetime steps
     dailySteps: 0, // NEW: Today's steps only (resets daily)
@@ -145,7 +147,14 @@ function checkNewAchievements() {
 }
 
 // XP Bank management
-function addToExperienceBank(amount) {
+function addToExperienceBank(amount, allowOverflow = false) {
+    if (allowOverflow) {
+        // For releases and special rewards - bypass cap
+        game.experienceBank += amount;
+        return amount;
+    }
+    
+    // For regular step XP - respect cap
     const spaceAvailable = game.experienceBankCap - game.experienceBank;
     const amountToAdd = Math.min(amount, spaceAvailable);
     const overflow = amount - amountToAdd;
@@ -235,7 +244,7 @@ async function init() {
         await testConnection();
         
         log('Step 2: Loading game data...');
-        loadGame();
+        await loadGame();
         
         log('Step 3: Checking daily reset...');
         checkDailyReset();
@@ -251,6 +260,13 @@ async function init() {
         
         log('Step 7: Checking lifetime achievements...');
         checkNewAchievements();
+        
+        // Start periodic backend sync (every 60 seconds)
+        syncInterval = setInterval(() => {
+            if (isConnected) {
+                saveGameToBackend();
+            }
+        }, 60000);
         
         log('Initialization complete!');
     } catch (error) {
@@ -531,13 +547,15 @@ async function distributeExperienceToRoster(totalExp) {
         return;
     }
     
-    // Add any banked experience to the total
+    // Check if bank is at cap - if so, use banked XP but don't add new XP to bank
+    var bankAtCap = game.experienceBank >= game.experienceBankCap;
     var availableExp = totalExp + game.experienceBank;
     var originalBanked = game.experienceBank;
     game.experienceBank = 0; // Clear the bank
     
     console.log('availableExp:', availableExp);
     console.log('originalBanked:', originalBanked);
+    console.log('bankAtCap:', bankAtCap);
     
     if (originalBanked > 0) {
         log('Using ' + originalBanked + ' banked + ' + totalExp + ' new = ' + availableExp + ' total experience');
@@ -597,7 +615,7 @@ async function distributeExperienceToRoster(totalExp) {
         return;
     }
     
-    // Distribute experience in order, maxing out each stepling before moving to next
+    // Distribute experience in order, applying as much as possible to each stepling
     var remainingExp = availableExp;
     var leveledUp = [];
     
@@ -611,36 +629,39 @@ async function distributeExperienceToRoster(totalExp) {
         console.log('Current level:', stepling.level, 'Max level:', maxLevel);
         console.log('Remaining exp:', remainingExp);
         
-        // Calculate how much experience this stepling can use to max out
-        var expNeeded = 0;
+        // Calculate how much experience this stepling can use (as much as possible, not necessarily to max)
+        var expToUse = 0;
         var currentLevel = stepling.level;
         var tempExp = remainingExp;
+        var levelsGainable = 0;
         
-        // Calculate total exp needed to max out this stepling
+        // Calculate how much XP we can actually use (level up as much as possible with available XP)
         while (currentLevel < maxLevel && tempExp > 0) {
             var expForNextLevel = currentLevel * 10;
-            console.log('Level', currentLevel, 'needs', expForNextLevel, 'exp');
+            console.log('Level', currentLevel, 'needs', expForNextLevel, 'exp, have', tempExp);
             if (tempExp >= expForNextLevel) {
-                expNeeded += expForNextLevel;
+                expToUse += expForNextLevel;
                 tempExp -= expForNextLevel;
                 currentLevel++;
-                console.log('Can level up to', currentLevel, 'total exp needed so far:', expNeeded);
+                levelsGainable++;
+                console.log('Can level up to', currentLevel, 'total exp to use:', expToUse);
             } else {
-                console.log('Not enough exp for next level');
+                // Not enough for next level, stop here
+                console.log('Not enough exp for next level, stopping');
                 break;
             }
         }
         
-        console.log('Final expNeeded for this stepling:', expNeeded);
+        console.log('Final expToUse for this stepling:', expToUse, 'levels gainable:', levelsGainable);
         
-        if (expNeeded > 0) {
-            // Level up this stepling
+        if (expToUse > 0 && levelsGainable > 0) {
+            // Level up this stepling with whatever XP we can use
             try {
-                console.log('Making API call to level up stepling:', stepling.id);
+                console.log('Making API call to level up stepling:', stepling.id, 'with', expToUse, 'XP');
                 var response = await fetch(API_BASE + '/api/steplings/' + stepling.id + '/levelup', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ experiencePoints: expNeeded })
+                    body: JSON.stringify({ experiencePoints: expToUse })
                 });
                 
                 console.log('API response status:', response.status);
@@ -655,7 +676,7 @@ async function distributeExperienceToRoster(totalExp) {
                         var levelsGained = updatedStepling.level - stepling.level;
                         log('✨ #' + steplingData.order + ' ' + species.name + ' gained ' + levelsGained + ' levels! (Lv.' + updatedStepling.level + ')');
                         leveledUp.push('#' + steplingData.order + ' ' + species.name);
-                        remainingExp -= expNeeded;
+                        remainingExp -= expToUse;
                         console.log('Successfully leveled up, remaining exp:', remainingExp);
                     } else {
                         console.log('API returned success=false:', result.error);
@@ -700,9 +721,7 @@ async function distributeExperienceToRoster(totalExp) {
 // Manage training roster
 function manageTrainingRoster() {
     console.log('manageTrainingRoster called');
-    document.getElementById('species-section').style.display = 'none';
-    document.getElementById('steplings-section').style.display = 'none';
-    document.getElementById('training-roster-section').style.display = 'block';
+    showSection('training-roster-section');
     
     // Update the roster description with current max slots
     const maxSlots = game.lifetimeAchievements.trainingRosterSlots || 10;
@@ -717,8 +736,7 @@ function manageTrainingRoster() {
 
 // Hide training roster
 function hideTrainingRoster() {
-    document.getElementById('training-roster-section').style.display = 'none';
-    document.getElementById('species-section').style.display = 'block';
+    closeAllSections();
 }
 
 // Load training roster
@@ -780,10 +798,7 @@ async function applyBankedExperience() {
 // Manage fusion
 function manageFusion() {
     console.log('manageFusion called');
-    document.getElementById('species-section').style.display = 'none';
-    document.getElementById('steplings-section').style.display = 'none';
-    document.getElementById('training-roster-section').style.display = 'none';
-    document.getElementById('fusion-section').style.display = 'block';
+    showSection('fusion-section');
     
     // Reset fusion state
     game.fusionSlot1 = null;
@@ -796,8 +811,7 @@ function manageFusion() {
 
 // Hide fusion
 function hideFusion() {
-    document.getElementById('fusion-section').style.display = 'none';
-    document.getElementById('species-section').style.display = 'block';
+    closeAllSections();
 }
 
 // Load steplings for fusion
@@ -1132,13 +1146,7 @@ function toggleSteplingInRoster(steplingId) {
 
 function viewSteplings() {
     console.log('viewSteplings called');
-    var speciesSection = document.getElementById('species-section');
-    var steplingsSection = document.getElementById('steplings-section');
-    console.log('species section:', speciesSection);
-    console.log('steplings section:', steplingsSection);
-    
-    if (speciesSection) speciesSection.style.display = 'none';
-    if (steplingsSection) steplingsSection.style.display = 'block';
+    showSection('steplings-section');
     
     log('Viewing steplings...');
     loadSteplings();
@@ -1146,8 +1154,7 @@ function viewSteplings() {
 
 // Hide steplings
 function hideSteplings() {
-    document.getElementById('steplings-section').style.display = 'none';
-    document.getElementById('species-section').style.display = 'block';
+    closeAllSections();
 }
 
 // Debug steplings
@@ -1483,7 +1490,7 @@ function getMilestoneProgress() {
 function updateMilestoneDisplay() {
     var progress = getMilestoneProgress();
     var container = document.getElementById('milestone-bars');
-    if (!container) return;
+    var popupContainer = document.getElementById('milestone-bars-popup');
     
     var html = '';
     
@@ -1508,7 +1515,8 @@ function updateMilestoneDisplay() {
         html += '</div>';
     }
     
-    container.innerHTML = html;
+    if (container) container.innerHTML = html;
+    if (popupContainer) popupContainer.innerHTML = html;
 }
 
 // Update achievement display
@@ -1516,53 +1524,53 @@ function updateAchievementDisplay() {
     const totalSteps = game.steps;
     const achievements = game.lifetimeAchievements;
     
-    // Update summary
+    // Update summary (both main and popup)
     const summaryEl = document.getElementById('achievement-summary');
-    if (summaryEl) {
-        const unlockedCount = achievements.unlockedAchievements.length;
-        const totalNamed = LIFETIME_ACHIEVEMENTS.length;
-        
-        // Calculate infinite milestones
-        let infiniteMilestones = 0;
-        if (totalSteps > 3500000) {
-            infiniteMilestones = Math.floor((totalSteps - 3500000) / 600000);
-        }
-        
-        let summaryText = '<div style="font-weight: bold; margin-bottom: 8px; font-size: 16px; color: #ffd700;">';
-        summaryText += '🚶 ' + totalSteps.toLocaleString() + ' Total Steps';
-        summaryText += '</div>';
-        
-        summaryText += '<div style="font-weight: bold; margin-bottom: 5px;">';
-        summaryText += unlockedCount + '/' + totalNamed + ' Named Achievements';
-        if (infiniteMilestones > 0) {
-            summaryText += ' + ' + infiniteMilestones + ' Infinite';
-        }
-        summaryText += '</div>';
-        
-        // Show active bonuses
-        const bonuses = [];
-        if (achievements.bonusCellsPerDay > 0) bonuses.push('🎁 +' + achievements.bonusCellsPerDay + ' cells/day');
-        if (achievements.discoveryEfficiency > 0) bonuses.push('⚡ ' + achievements.discoveryEfficiency + '% discovery');
-        if (achievements.trainingEfficiency > 0) bonuses.push('💪 ' + achievements.trainingEfficiency + '% training');
-        if (achievements.clickPower > 1) bonuses.push('🖱️ x' + achievements.clickPower + ' clicks');
-        if (achievements.trainingRosterSlots > 10) bonuses.push('👥 ' + achievements.trainingRosterSlots + ' slots');
-        if (achievements.releaseXpBonus > 0) bonuses.push('💎 +' + achievements.releaseXpBonus + '% release');
-        
-        if (bonuses.length > 0) {
-            summaryText += '<div style="opacity: 0.9;">' + bonuses.join(' • ') + '</div>';
-        } else {
-            summaryText += '<div style="opacity: 0.7;">No bonuses yet - keep walking!</div>';
-        }
-        
-        summaryText += '<div style="font-size: 11px; opacity: 0.6; margin-top: 5px;">Tap to view details</div>';
-        
-        summaryEl.innerHTML = summaryText;
+    const summaryPopupEl = document.getElementById('achievement-summary-popup');
+    
+    const unlockedCount = achievements.unlockedAchievements.length;
+    const totalNamed = LIFETIME_ACHIEVEMENTS.length;
+    
+    // Calculate infinite milestones
+    let infiniteMilestones = 0;
+    if (totalSteps > 3500000) {
+        infiniteMilestones = Math.floor((totalSteps - 3500000) / 600000);
     }
     
-    // Update details (shown when expanded)
+    let summaryText = '<div style="font-weight: bold; margin-bottom: 8px; font-size: 16px; color: #ffd700;">';
+    summaryText += '🚶 ' + totalSteps.toLocaleString() + ' Total Steps';
+    summaryText += '</div>';
+    
+    summaryText += '<div style="font-weight: bold; margin-bottom: 5px;">';
+    summaryText += unlockedCount + '/' + totalNamed + ' Named Achievements';
+    if (infiniteMilestones > 0) {
+        summaryText += ' + ' + infiniteMilestones + ' Infinite';
+    }
+    summaryText += '</div>';
+    
+    // Show active bonuses
+    const bonuses = [];
+    if (achievements.bonusCellsPerDay > 0) bonuses.push('🎁 +' + achievements.bonusCellsPerDay + ' cells/day');
+    if (achievements.discoveryEfficiency > 0) bonuses.push('⚡ ' + achievements.discoveryEfficiency + '% discovery');
+    if (achievements.trainingEfficiency > 0) bonuses.push('💪 ' + achievements.trainingEfficiency + '% training');
+    if (achievements.clickPower > 1) bonuses.push('🖱️ x' + achievements.clickPower + ' clicks');
+    if (achievements.trainingRosterSlots > 10) bonuses.push('👥 ' + achievements.trainingRosterSlots + ' slots');
+    if (achievements.releaseXpBonus > 0) bonuses.push('💎 +' + achievements.releaseXpBonus + '% release');
+    
+    if (bonuses.length > 0) {
+        summaryText += '<div style="opacity: 0.9;">' + bonuses.join(' • ') + '</div>';
+    } else {
+        summaryText += '<div style="opacity: 0.7;">No bonuses yet - keep walking!</div>';
+    }
+    
+    if (summaryEl) summaryEl.innerHTML = summaryText;
+    if (summaryPopupEl) summaryPopupEl.innerHTML = summaryText;
+    
+    // Update details (shown in popup)
     const detailsEl = document.getElementById('achievement-details');
-    if (detailsEl) {
-        let detailsHtml = '<div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 12px;">';
+    const detailsPopupEl = document.getElementById('achievement-details-popup');
+    
+    let detailsHtml = '<div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 12px;">';
         
         // Show total steps prominently at top of details
         detailsHtml += '<div style="text-align: center; margin-bottom: 15px; padding: 10px; background: rgba(255,215,0,0.2); border-radius: 8px;">';
@@ -1666,8 +1674,8 @@ function updateAchievementDisplay() {
         }
         
         detailsHtml += '</div>';
-        detailsEl.innerHTML = detailsHtml;
-    }
+        if (detailsEl) detailsEl.innerHTML = detailsHtml;
+        if (detailsPopupEl) detailsPopupEl.innerHTML = detailsHtml;
 }
 
 // Toggle achievement details
@@ -1680,6 +1688,14 @@ function toggleAchievementDetails() {
             detailsEl.style.display = 'none';
         }
     }
+}
+
+// View progress and achievements popup
+function viewProgress() {
+    showSection('progress-section');
+    // Update displays when opening
+    updateAchievementDisplay();
+    updateMilestoneDisplay();
 }
 
 // Get total magnifying glasses
@@ -1698,20 +1714,13 @@ function getBestGlassTier() {
 
 // Show magnifying glass inventory
 function showGlassInventory() {
-    document.getElementById('species-section').style.display = 'none';
-    document.getElementById('steplings-section').style.display = 'none';
-    document.getElementById('training-roster-section').style.display = 'none';
-    document.getElementById('fusion-section').style.display = 'none';
-    document.getElementById('stepling-details-section').style.display = 'none';
-    document.getElementById('glass-inventory-section').style.display = 'block';
-    
+    showSection('glass-inventory-section');
     updateGlassInventoryGrid();
 }
 
 // Hide magnifying glass inventory
 function hideGlassInventory() {
-    document.getElementById('glass-inventory-section').style.display = 'none';
-    document.getElementById('species-section').style.display = 'block';
+    closeAllSections();
 }
 
 // Update glass inventory grid
@@ -1787,13 +1796,41 @@ function selectGlassTier(tier) {
     }
 }
 
+// Overlay system helpers
+function showSection(sectionId) {
+    // Hide all sections first
+    closeAllSections();
+    
+    // Show the requested section and backdrop
+    var section = document.getElementById(sectionId);
+    var backdrop = document.getElementById('section-backdrop');
+    
+    if (section) {
+        section.classList.add('visible');
+        backdrop.classList.add('visible');
+    }
+}
+
+function closeAllSections() {
+    // Hide all section overlays
+    var sections = document.querySelectorAll('.section');
+    for (var i = 0; i < sections.length; i++) {
+        sections[i].classList.remove('visible');
+    }
+    
+    // Hide backdrop
+    var backdrop = document.getElementById('section-backdrop');
+    if (backdrop) {
+        backdrop.classList.remove('visible');
+    }
+}
+
 // Update display
 function updateDisplay() {
     // Show daily steps in the main display, with total in parentheses
     const dailySteps = getDailySteps();
     document.getElementById('step-count').innerHTML = dailySteps + ' <small>(today)</small>';
     document.getElementById('cells').innerHTML = game.cells;
-    document.getElementById('exp').innerHTML = game.experience;
     document.getElementById('exp-bank').innerHTML = game.experienceBank + '/' + game.experienceBankCap;
     document.getElementById('clicks').innerHTML = game.clicks;
     document.getElementById('glass').innerHTML = getTotalGlasses();
@@ -1978,12 +2015,8 @@ function showSteplingDetails(steplingId) {
     
     currentSteplingId = steplingId; // Track current stepling
     
-    // Hide other sections
-    document.getElementById('species-section').style.display = 'none';
-    document.getElementById('steplings-section').style.display = 'none';
-    document.getElementById('training-roster-section').style.display = 'none';
-    document.getElementById('fusion-section').style.display = 'none';
-    document.getElementById('stepling-details-section').style.display = 'block';
+    // Show the details section
+    showSection('stepling-details-section');
     
     // Update details
     var species = stepling.species || { name: 'Unknown', emoji: '❓', rarity: 'common' };
@@ -2124,14 +2157,9 @@ async function releaseStepling(steplingId, expValue) {
         game.trainingRoster = game.trainingRoster.filter(id => id !== steplingId);
         delete game.rosterOrder[steplingId];
         
-        // Add experience to XP bank (not regular experience)
-        const added = addToExperienceBank(expValue);
-        
-        if (added < expValue) {
-            log('Released stepling for ' + expValue.toLocaleString() + ' XP! Banked ' + added + ' (bank full).');
-        } else {
-            log('Released stepling for ' + expValue.toLocaleString() + ' XP! Added to XP bank.');
-        }
+        // Add experience to XP bank - allow overflow for releases
+        const added = addToExperienceBank(expValue, true);
+        log('Released stepling for ' + expValue.toLocaleString() + ' XP! Added to XP bank.');
         
         // Close details and refresh displays
         hideSteplingDetails();
@@ -2148,18 +2176,108 @@ var currentSteplingId = null; // Track which stepling details are being shown
 
 // Hide stepling details
 function hideSteplingDetails() {
-    document.getElementById('stepling-details-section').style.display = 'none';
-    document.getElementById('steplings-section').style.display = 'block';
+    closeAllSections();
 }
 
 // Save/load
+var lastBackendSync = 0; // Track last backend sync time
+var syncInterval = null; // Interval for periodic syncing
+
 function saveGame() {
     if (typeof localStorage !== 'undefined') {
         localStorage.setItem('stepScientistsMobile', JSON.stringify(game));
     }
+    
+    // Also sync to backend periodically (throttled to every 30 seconds)
+    const now = Date.now();
+    if (isConnected && now - lastBackendSync > 30000) {
+        saveGameToBackend();
+    }
 }
 
-function loadGame() {
+async function saveGameToBackend() {
+    if (!isConnected) return;
+    
+    try {
+        lastBackendSync = Date.now();
+        const response = await fetch(API_BASE + '/api/players/' + MOBILE_PLAYER_ID + '/gamestate', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameState: game })
+        });
+        
+        if (response.ok) {
+            console.log('✅ Game state synced to backend');
+        }
+    } catch (error) {
+        console.error('Failed to sync game state to backend:', error);
+    }
+}
+
+async function loadGameFromBackend() {
+    if (!isConnected) return null;
+    
+    try {
+        const response = await fetch(API_BASE + '/api/players/' + MOBILE_PLAYER_ID + '/gamestate');
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.gameState) {
+                console.log('✅ Loaded game state from backend');
+                return result.gameState;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load game state from backend:', error);
+    }
+    
+    return null;
+}
+
+async function loadGame() {
+    // Try to load from backend first if connected
+    if (isConnected) {
+        const backendState = await loadGameFromBackend();
+        if (backendState) {
+            // Merge backend state with defaults
+            game = Object.assign({
+                steps: 0,
+                dailySteps: 0,
+                lastStepDate: null,
+                clicks: 0,
+                mode: 'discovery',
+                cells: 0,
+                experience: 0,
+                experienceBank: 0,
+                experienceBankCap: 100,
+                magnifyingGlass: { uncommon: 0, rare: 0, epic: 0, legendary: 0 },
+                discoveredSpecies: [],
+                milestonesReached: [],
+                trainingRoster: [],
+                rosterOrder: {},
+                fusionSlot1: null,
+                fusionSlot2: null,
+                activeFusionSlot: 1,
+                selectedGlassTier: null,
+                lifetimeAchievements: {
+                    bonusCellsPerDay: 0,
+                    discoveryEfficiency: 0,
+                    trainingEfficiency: 0,
+                    clickPower: 1,
+                    experienceBankCap: 100,
+                    trainingRosterSlots: 10,
+                    releaseXpBonus: 0,
+                    unlockedAchievements: []
+                }
+            }, backendState);
+            
+            log('📥 Restored game state from backend');
+            saveGame(); // Save to localStorage too
+            return;
+        }
+    }
+    
+    // Fall back to localStorage
     if (typeof localStorage !== 'undefined') {
         var saved = localStorage.getItem('stepScientistsMobile');
         if (saved) {

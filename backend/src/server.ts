@@ -692,6 +692,57 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/achievements', lifetimeAchievementRoutes);
 // app.use('/api/steplings', steplingRoutes); // Temporarily disabled due to auth issues
 
+// Game State Sync Endpoints
+app.get('/api/players/:playerId/gamestate', async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    
+    const player = await database('players')
+      .where('id', playerId)
+      .select('game_state', 'game_state_updated_at')
+      .first();
+    
+    if (!player) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+    
+    res.json({
+      success: true,
+      gameState: player.game_state || null,
+      updatedAt: player.game_state_updated_at || null
+    });
+  } catch (error) {
+    console.error('Error fetching game state:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch game state' });
+  }
+});
+
+app.put('/api/players/:playerId/gamestate', async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    const { gameState } = req.body;
+    
+    if (!gameState) {
+      return res.status(400).json({ success: false, error: 'Game state is required' });
+    }
+    
+    await database('players')
+      .where('id', playerId)
+      .update({
+        game_state: JSON.stringify(gameState),
+        game_state_updated_at: database.fn.now()
+      });
+    
+    res.json({
+      success: true,
+      message: 'Game state saved successfully'
+    });
+  } catch (error) {
+    console.error('Error saving game state:', error);
+    res.status(500).json({ success: false, error: 'Failed to save game state' });
+  }
+});
+
 // 404 handler
 app.use('*', (req: express.Request, res: express.Response) => {
   res.status(404).json({
