@@ -2270,6 +2270,7 @@ async function initializeGoogleFit() {
                 // Try to restore saved token
                 const savedToken = localStorage.getItem('googleFitToken');
                 const tokenExpiry = localStorage.getItem('googleFitTokenExpiry');
+                const refreshToken = localStorage.getItem('googleFitRefreshToken');
                 
                 if (savedToken && tokenExpiry) {
                     const now = Date.now();
@@ -2281,21 +2282,37 @@ async function initializeGoogleFit() {
                         log('✅ Restored Google Fit session');
                         updateGoogleFitStatus(true);
                         
-                        // If token expires in less than 5 minutes, try to refresh it silently
+                        // If token expires in less than 5 minutes, refresh it
                         if (expiry - now < 5 * 60 * 1000) {
-                            log('🔄 Token expiring soon, attempting silent refresh...');
-                            this.requestPermission(true).catch(() => {
-                                log('Silent refresh failed, will need manual reconnect');
-                            });
+                            log('🔄 Token expiring soon, refreshing...');
+                            // Try refresh token first
+                            if (refreshToken) {
+                                await this.refreshWithRefreshToken();
+                            } else {
+                                // Fall back to silent refresh
+                                this.requestPermission(true).catch(() => {
+                                    log('Silent refresh failed, will need manual reconnect');
+                                });
+                            }
                         }
                         
                         return true;
                     } else {
-                        // Token expired, try silent refresh first
+                        // Token expired
                         localStorage.removeItem('googleFitToken');
                         localStorage.removeItem('googleFitTokenExpiry');
-                        log('🔄 Token expired, attempting silent refresh...');
+                        log('🔄 Token expired, attempting refresh...');
                         
+                        // Try refresh token first
+                        if (refreshToken) {
+                            const refreshed = await this.refreshWithRefreshToken();
+                            if (refreshed) {
+                                log('✅ Token refreshed using refresh token');
+                                return true;
+                            }
+                        }
+                        
+                        // Fall back to silent refresh
                         try {
                             const refreshed = await this.requestPermission(true);
                             if (refreshed) {
@@ -2313,6 +2330,53 @@ async function initializeGoogleFit() {
                 return true;
             },
             
+            async refreshWithRefreshToken() {
+                const refreshToken = localStorage.getItem('googleFitRefreshToken');
+                if (!refreshToken) {
+                    log('No refresh token available');
+                    return false;
+                }
+                
+                try {
+                    log('🔄 Refreshing Google Fit token with refresh token...');
+                    
+                    // Use Google's token endpoint to refresh
+                    const response = await fetch('https://oauth2.googleapis.com/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            client_id: '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com',
+                            refresh_token: refreshToken,
+                            grant_type: 'refresh_token'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Save new access token
+                        this.accessToken = data.access_token;
+                        const expiryTime = Date.now() + (data.expires_in * 1000);
+                        localStorage.setItem('googleFitToken', data.access_token);
+                        localStorage.setItem('googleFitTokenExpiry', expiryTime.toString());
+                        
+                        log('✅ Token refreshed successfully!');
+                        updateGoogleFitStatus(true);
+                        return true;
+                    } else {
+                        log('❌ Token refresh failed');
+                        // Refresh token might be expired, remove it
+                        localStorage.removeItem('googleFitRefreshToken');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Token refresh error:', error);
+                    return false;
+                }
+            },
+            
             async requestPermission(silent = false) {
                 if (!this.initialized) {
                     await this.initialize();
@@ -2325,15 +2389,21 @@ async function initializeGoogleFit() {
                     const tokenClient = window.google.accounts.oauth2.initTokenClient({
                         client_id: CLIENT_ID,
                         scope: SCOPES,
-                        prompt: silent ? '' : 'consent', // Empty prompt allows silent refresh if user previously consented
+                        prompt: silent ? '' : 'consent',
                         callback: (tokenResponse) => {
                             if (tokenResponse.access_token) {
                                 this.accessToken = tokenResponse.access_token;
                                 
-                                // Save token with expiry (tokens typically last 1 hour)
+                                // Save access token with expiry (tokens typically last 1 hour)
                                 const expiryTime = Date.now() + (3600 * 1000); // 1 hour from now
                                 localStorage.setItem('googleFitToken', tokenResponse.access_token);
                                 localStorage.setItem('googleFitTokenExpiry', expiryTime.toString());
+                                
+                                // Save refresh token if provided (only on first authorization)
+                                if (tokenResponse.refresh_token) {
+                                    localStorage.setItem('googleFitRefreshToken', tokenResponse.refresh_token);
+                                    log('✅ Refresh token saved - you won\'t need to reconnect often!');
+                                }
                                 
                                 if (!silent) {
                                     log('✅ Successfully connected to Google Fit!');
@@ -2361,7 +2431,9 @@ async function initializeGoogleFit() {
                         }
                     });
                     
-                    tokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
+                    tokenClient.requestAccessToken({ 
+                        prompt: silent ? '' : 'consent'
+                    });
                 });
             },
             
@@ -2416,13 +2488,24 @@ async function initializeGoogleFit() {
 
                     return totalSteps;
                 } catch (error) {
-                    // If token is invalid, try silent refresh
+                    // If token is invalid, try refresh token first
                     if (error.status === 401 || error.status === 403) {
-                        log('🔄 Token expired, attempting silent refresh...');
+                        log('🔄 Token expired, attempting refresh...');
                         this.accessToken = null;
                         localStorage.removeItem('googleFitToken');
                         localStorage.removeItem('googleFitTokenExpiry');
                         
+                        // Try refresh token first
+                        const refreshToken = localStorage.getItem('googleFitRefreshToken');
+                        if (refreshToken) {
+                            const refreshed = await this.refreshWithRefreshToken();
+                            if (refreshed) {
+                                // Retry the request with new token
+                                return await this.getCurrentSteps();
+                            }
+                        }
+                        
+                        // Fall back to silent refresh
                         try {
                             const refreshed = await this.requestPermission(true);
                             if (refreshed) {
@@ -2445,6 +2528,7 @@ async function initializeGoogleFit() {
                 this.accessToken = null;
                 localStorage.removeItem('googleFitToken');
                 localStorage.removeItem('googleFitTokenExpiry');
+                localStorage.removeItem('googleFitRefreshToken');
                 updateGoogleFitStatus(false);
                 log('🔌 Disconnected from Google Fit');
             }
