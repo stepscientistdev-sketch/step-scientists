@@ -7,10 +7,12 @@ var game = {
     steps: 5000, // Keep for backward compatibility - will become total lifetime steps
     dailySteps: 0, // NEW: Today's steps only (resets daily)
     lastStepDate: null, // NEW: Track when steps were last updated
+    clicks: 0, // NEW: Idle clicker progress (separate from steps)
     mode: 'discovery',
     cells: 5,
     experience: 0,
     experienceBank: 0, // Banked experience for future use
+    experienceBankCap: 100, // Maximum XP that can be stored in bank
     magnifyingGlass: { uncommon: 0, rare: 0, epic: 0, legendary: 0 }, // Track different tiers
     discoveredSpecies: [],
     milestonesReached: [], // Track which milestones we've already awarded - now stores objects with {milestone, tier, cycle}
@@ -19,13 +21,147 @@ var game = {
     fusionSlot1: null, // Selected stepling for fusion slot 1
     fusionSlot2: null, // Selected stepling for fusion slot 2
     activeFusionSlot: 1, // Which slot is currently being selected (1 or 2)
-    selectedGlassTier: null // Which magnifying glass tier to use (null = auto-select best)
+    selectedGlassTier: null, // Which magnifying glass tier to use (null = auto-select best)
+    lifetimeAchievements: {
+        bonusCellsPerDay: 0,
+        discoveryEfficiency: 0,
+        trainingEfficiency: 0,
+        clickPower: 1,
+        trainingRosterSlots: 10,
+        releaseXpBonus: 0,
+        unlockedAchievements: []
+    }
 };
 
 var allSpecies = [];
 var playerSteplings = [];
 var isConnected = false;
 var useMagnifyingGlass = false;
+
+// Lifetime Achievement System
+const LIFETIME_ACHIEVEMENTS = [
+    { steps: 10000, name: "First Steps", rewards: { experienceBankCap: 150 } },
+    { steps: 50000, name: "Getting Active", rewards: { clickPower: 2, experienceBankCap: 200 } },
+    { steps: 100000, name: "Dedicated Walker", rewards: { bonusCellsPerDay: 1, discoveryEfficiency: 2, experienceBankCap: 300 } },
+    { steps: 200000, name: "Consistent Mover", rewards: { trainingEfficiency: 5, experienceBankCap: 400 } },
+    { steps: 300000, name: "Fitness Enthusiast", rewards: { trainingRosterSlots: 12, experienceBankCap: 500 } },
+    { steps: 600000, name: "Marathon Mindset", rewards: { bonusCellsPerDay: 2, discoveryEfficiency: 4, experienceBankCap: 650 } },
+    { steps: 900000, name: "Endurance Expert", rewards: { clickPower: 3, trainingEfficiency: 10, experienceBankCap: 800 } },
+    { steps: 1200000, name: "Distance Devotee", rewards: { bonusCellsPerDay: 3, discoveryEfficiency: 6, experienceBankCap: 1000 } },
+    { steps: 1800000, name: "Fitness Warrior", rewards: { trainingRosterSlots: 14, trainingEfficiency: 15, experienceBankCap: 1500 } },
+    { steps: 2400000, name: "Walking Legend", rewards: { bonusCellsPerDay: 4, discoveryEfficiency: 8, clickPower: 4, experienceBankCap: 2000 } },
+    { steps: 3000000, name: "Fitness Master", rewards: { trainingEfficiency: 20, releaseXpBonus: 50, experienceBankCap: 3000 } },
+    { steps: 3500000, name: "Ultimate Step Scientist", rewards: { bonusCellsPerDay: 5, discoveryEfficiency: 20, trainingRosterSlots: 16, clickPower: 7, experienceBankCap: Infinity } }
+];
+
+function calculateLifetimeAchievements(totalSteps) {
+    const achievements = {
+        bonusCellsPerDay: 0,
+        discoveryEfficiency: 0,
+        trainingEfficiency: 0,
+        clickPower: 1,
+        experienceBankCap: 100,
+        trainingRosterSlots: 10,
+        releaseXpBonus: 0,
+        unlockedAchievements: []
+    };
+    
+    // Apply all unlocked named achievements
+    for (let i = 0; i < LIFETIME_ACHIEVEMENTS.length; i++) {
+        const achievement = LIFETIME_ACHIEVEMENTS[i];
+        if (totalSteps >= achievement.steps) {
+            achievements.unlockedAchievements.push(achievement.name);
+            // Apply rewards (they stack/override)
+            if (achievement.rewards.bonusCellsPerDay !== undefined) {
+                achievements.bonusCellsPerDay = achievement.rewards.bonusCellsPerDay;
+            }
+            if (achievement.rewards.discoveryEfficiency !== undefined) {
+                achievements.discoveryEfficiency = achievement.rewards.discoveryEfficiency;
+            }
+            if (achievement.rewards.trainingEfficiency !== undefined) {
+                achievements.trainingEfficiency = achievement.rewards.trainingEfficiency;
+            }
+            if (achievement.rewards.clickPower !== undefined) {
+                achievements.clickPower = achievement.rewards.clickPower;
+            }
+            if (achievement.rewards.experienceBankCap !== undefined) {
+                achievements.experienceBankCap = achievement.rewards.experienceBankCap;
+            }
+            if (achievement.rewards.trainingRosterSlots !== undefined) {
+                achievements.trainingRosterSlots = achievement.rewards.trainingRosterSlots;
+            }
+            if (achievement.rewards.releaseXpBonus !== undefined) {
+                achievements.releaseXpBonus = achievement.rewards.releaseXpBonus;
+            }
+        }
+    }
+    
+    // Apply infinite scaling after 3.5M steps (every 600K steps)
+    if (totalSteps > 3500000) {
+        const stepsAfter35M = totalSteps - 3500000;
+        const infiniteMilestones = Math.floor(stepsAfter35M / 600000);
+        
+        // Bonus cells (capped at 10 total, reached at 6.5M steps = 5 milestones)
+        const bonusCellsFromInfinite = Math.min(infiniteMilestones, 5);
+        achievements.bonusCellsPerDay += bonusCellsFromInfinite;
+        
+        // Discovery efficiency (capped at 50%, reached at 12.5M steps = 15 milestones)
+        const discoveryFromInfinite = Math.min(infiniteMilestones * 2, 30);
+        achievements.discoveryEfficiency = Math.min(achievements.discoveryEfficiency + discoveryFromInfinite, 50);
+        
+        // Training efficiency (capped at 50%, reached at 12.5M steps = 15 milestones)
+        const trainingFromInfinite = Math.min(infiniteMilestones * 2, 30);
+        achievements.trainingEfficiency = Math.min(achievements.trainingEfficiency + trainingFromInfinite, 50);
+        
+        // After caps, bonus cells continue infinitely
+        if (infiniteMilestones > 15) {
+            achievements.bonusCellsPerDay += (infiniteMilestones - 15);
+        }
+    }
+    
+    return achievements;
+}
+
+function checkNewAchievements() {
+    const totalSteps = game.steps;
+    const newAchievements = calculateLifetimeAchievements(totalSteps);
+    
+    // Check for newly unlocked achievements
+    const oldUnlocked = game.lifetimeAchievements.unlockedAchievements || [];
+    const newlyUnlocked = newAchievements.unlockedAchievements.filter(name => !oldUnlocked.includes(name));
+    
+    // Update game state
+    game.lifetimeAchievements = newAchievements;
+    game.experienceBankCap = newAchievements.experienceBankCap;
+    
+    // Notify about new achievements
+    if (newlyUnlocked.length > 0) {
+        for (let i = 0; i < newlyUnlocked.length; i++) {
+            log('🏆 ACHIEVEMENT UNLOCKED: ' + newlyUnlocked[i] + '!');
+        }
+    }
+    
+    return newlyUnlocked;
+}
+
+// XP Bank management
+function addToExperienceBank(amount) {
+    const spaceAvailable = game.experienceBankCap - game.experienceBank;
+    const amountToAdd = Math.min(amount, spaceAvailable);
+    const overflow = amount - amountToAdd;
+    
+    game.experienceBank += amountToAdd;
+    
+    if (overflow > 0) {
+        log('⚠️ XP Bank full! Lost ' + overflow + ' XP (Cap: ' + game.experienceBankCap + ')');
+    }
+    
+    return amountToAdd;
+}
+
+function getExperienceBankSpace() {
+    return game.experienceBankCap - game.experienceBank;
+}
 
 // Daily step management functions
 function getTodayDateString() {
@@ -40,9 +176,21 @@ function checkDailyReset() {
         // New day detected - reset daily steps
         if (game.lastStepDate) {
             log('🌅 New day detected! Daily steps reset to 0');
+            
+            // Award daily bonus cells from achievements
+            awardDailyBonusCells();
         }
         game.dailySteps = 0;
         game.lastStepDate = today;
+        saveGame();
+    }
+}
+
+function awardDailyBonusCells() {
+    const bonusCells = game.lifetimeAchievements.bonusCellsPerDay || 0;
+    if (bonusCells > 0) {
+        game.cells += bonusCells;
+        log('🎁 Daily bonus: +' + bonusCells + ' cells from achievements!');
         saveGame();
     }
 }
@@ -100,6 +248,9 @@ async function init() {
         
         log('Step 6: Loading steplings...');
         await loadSteplings();
+        
+        log('Step 7: Checking lifetime achievements...');
+        checkNewAchievements();
         
         log('Initialization complete!');
     } catch (error) {
@@ -164,37 +315,37 @@ async function testConnection() {
 }
 
 // Add steps
-async function addSteps() {
-    const stepsAdded = addManualSteps(100);
-    const dailySteps = getDailySteps();
+// Add clicks (idle gameplay - doesn't count toward milestones)
+async function addClick() {
+    game.clicks += 1;
+    
+    // Apply click power multiplier from achievements
+    const clickPower = game.lifetimeAchievements.clickPower || 1;
+    const effectiveProgress = clickPower;
     
     if (game.mode === 'discovery') {
-        const oldCells = Math.floor((dailySteps - stepsAdded) / 1000);
-        const newCells = Math.floor(dailySteps / 1000);
-        const cellsToAdd = newCells - oldCells;
-        
-        if (cellsToAdd > 0) {
-            game.cells += cellsToAdd;
-            log('Earned ' + cellsToAdd + ' cells!');
-        } else {
-            const needed = 1000 - (dailySteps % 1000);
-            log(needed + ' more steps for next cell');
+        // 1 click = 1 cell chance (same rate as 1000 steps = 1 cell)
+        // With click power, progress faster
+        const cellsToAdd = Math.floor((game.clicks * effectiveProgress) / 1000);
+        const prevCells = Math.floor(((game.clicks - 1) * effectiveProgress) / 1000);
+        if (cellsToAdd > prevCells) {
+            game.cells += (cellsToAdd - prevCells);
+            log('🖱️ Earned ' + (cellsToAdd - prevCells) + ' cell(s) from clicking! (x' + clickPower + ' power)');
         }
     } else {
-        const oldExp = Math.floor((dailySteps - stepsAdded) / 10);
-        const newExp = Math.floor(dailySteps / 10);
-        const expToAdd = newExp - oldExp;
-        
-        if (expToAdd > 0) {
-            game.experience += expToAdd;
-            log('Earned ' + expToAdd + ' experience!');
+        // 1 click = 1 XP chance (same rate as 10 steps = 1 XP)
+        const expToAdd = Math.floor((game.clicks * effectiveProgress) / 10);
+        const prevExp = Math.floor(((game.clicks - 1) * effectiveProgress) / 10);
+        if (expToAdd > prevExp) {
+            const gained = expToAdd - prevExp;
+            game.experience += gained;
+            log('🖱️ Earned ' + gained + ' experience from clicking! (x' + clickPower + ' power)');
             
             // Distribute experience to training roster
-            await distributeExperienceToRoster(expToAdd);
+            await distributeExperienceToRoster(gained);
         }
     }
     
-    checkMilestones();
     updateDisplay();
     saveGame();
 }
@@ -365,8 +516,17 @@ async function distributeExperienceToRoster(totalExp) {
     
     if (!isConnected || game.trainingRoster.length === 0) {
         // Bank the experience if no roster is set
-        game.experienceBank += totalExp;
-        log('No training roster set. Banked ' + totalExp + ' experience.');
+        const added = addToExperienceBank(totalExp);
+        
+        // Auto-switch to discovery mode if bank is full
+        if (added < totalExp && game.mode === 'training') {
+            game.mode = 'discovery';
+            log('⚠️ XP Bank full! Auto-switched to Discovery Mode.');
+            saveGame();
+        } else {
+            log('No training roster set. Banked ' + added + ' experience.');
+        }
+        
         updateDisplay();
         return;
     }
@@ -422,8 +582,17 @@ async function distributeExperienceToRoster(totalExp) {
     
     if (orderedSteplings.length === 0) {
         // All steplings are max level, bank the experience
-        game.experienceBank = availableExp;
-        log('All roster steplings are max level. Banked ' + availableExp + ' experience.');
+        const added = addToExperienceBank(availableExp);
+        
+        // Auto-switch to discovery mode if bank is full
+        if (added < availableExp && game.mode === 'training') {
+            game.mode = 'discovery';
+            log('⚠️ All steplings max level & XP Bank full! Auto-switched to Discovery Mode.');
+            saveGame();
+        } else {
+            log('All roster steplings are max level. Banked ' + added + ' experience.');
+        }
+        
         updateDisplay();
         return;
     }
@@ -512,8 +681,8 @@ async function distributeExperienceToRoster(totalExp) {
     
     // Bank any leftover experience
     if (remainingExp > 0) {
-        game.experienceBank = remainingExp;
-        log('Banked ' + remainingExp + ' leftover experience.');
+        const added = addToExperienceBank(remainingExp);
+        log('Banked ' + added + ' leftover experience.');
     }
     
     // Show summary
@@ -534,6 +703,13 @@ function manageTrainingRoster() {
     document.getElementById('species-section').style.display = 'none';
     document.getElementById('steplings-section').style.display = 'none';
     document.getElementById('training-roster-section').style.display = 'block';
+    
+    // Update the roster description with current max slots
+    const maxSlots = game.lifetimeAchievements.trainingRosterSlots || 10;
+    const rosterDesc = document.querySelector('#training-roster-section p');
+    if (rosterDesc) {
+        rosterDesc.innerHTML = 'Select steplings to receive experience points in Training Mode (Max ' + maxSlots + ', ordered 1-' + maxSlots + ')';
+    }
     
     log('Managing training roster...');
     loadTrainingRoster();
@@ -922,9 +1098,10 @@ function toggleSteplingInRoster(steplingId) {
     
     var index = game.trainingRoster.indexOf(steplingId);
     if (index === -1) {
-        // Add to roster
-        if (game.trainingRoster.length >= 10) {
-            log('Training roster is full! (Max 10 steplings)');
+        // Add to roster - check achievement-based limit
+        const maxSlots = game.lifetimeAchievements.trainingRosterSlots || 10;
+        if (game.trainingRoster.length >= maxSlots) {
+            log('Training roster is full! (Max ' + maxSlots + ' steplings)');
             return;
         }
         
@@ -1326,6 +1503,174 @@ function updateMilestoneDisplay() {
         html += '</div>';
         
         html += '<div style="background: rgba(255,255,255,0.2); border-radius: 10px; height: 8px; overflow: hidden;">';
+        html += '<div style="background: ' + tierColor + '; height: 100%; width: ' + p.progressPercent + '%; transition: width 0.3s;"></div>';
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// Update achievement display
+function updateAchievementDisplay() {
+    const totalSteps = game.steps;
+    const achievements = game.lifetimeAchievements;
+    
+    // Update summary
+    const summaryEl = document.getElementById('achievement-summary');
+    if (summaryEl) {
+        const unlockedCount = achievements.unlockedAchievements.length;
+        const totalNamed = LIFETIME_ACHIEVEMENTS.length;
+        
+        // Calculate infinite milestones
+        let infiniteMilestones = 0;
+        if (totalSteps > 3500000) {
+            infiniteMilestones = Math.floor((totalSteps - 3500000) / 600000);
+        }
+        
+        let summaryText = '<div style="font-weight: bold; margin-bottom: 5px;">';
+        summaryText += unlockedCount + '/' + totalNamed + ' Named Achievements';
+        if (infiniteMilestones > 0) {
+            summaryText += ' + ' + infiniteMilestones + ' Infinite';
+        }
+        summaryText += '</div>';
+        
+        // Show active bonuses
+        const bonuses = [];
+        if (achievements.bonusCellsPerDay > 0) bonuses.push('🎁 +' + achievements.bonusCellsPerDay + ' cells/day');
+        if (achievements.discoveryEfficiency > 0) bonuses.push('⚡ ' + achievements.discoveryEfficiency + '% discovery');
+        if (achievements.trainingEfficiency > 0) bonuses.push('💪 ' + achievements.trainingEfficiency + '% training');
+        if (achievements.clickPower > 1) bonuses.push('🖱️ x' + achievements.clickPower + ' clicks');
+        if (achievements.trainingRosterSlots > 10) bonuses.push('👥 ' + achievements.trainingRosterSlots + ' slots');
+        if (achievements.releaseXpBonus > 0) bonuses.push('💎 +' + achievements.releaseXpBonus + '% release');
+        
+        if (bonuses.length > 0) {
+            summaryText += '<div style="opacity: 0.9;">' + bonuses.join(' • ') + '</div>';
+        } else {
+            summaryText += '<div style="opacity: 0.7;">No bonuses yet - keep walking!</div>';
+        }
+        
+        summaryText += '<div style="font-size: 11px; opacity: 0.6; margin-top: 5px;">Tap to view details</div>';
+        
+        summaryEl.innerHTML = summaryText;
+    }
+    
+    // Update details (shown when expanded)
+    const detailsEl = document.getElementById('achievement-details');
+    if (detailsEl) {
+        let detailsHtml = '<div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 12px;">';
+        
+        // Show next achievement
+        let nextAchievement = null;
+        for (let i = 0; i < LIFETIME_ACHIEVEMENTS.length; i++) {
+            if (totalSteps < LIFETIME_ACHIEVEMENTS[i].steps) {
+                nextAchievement = LIFETIME_ACHIEVEMENTS[i];
+                break;
+            }
+        }
+        
+        if (nextAchievement) {
+            const stepsNeeded = nextAchievement.steps - totalSteps;
+            const progress = (totalSteps / nextAchievement.steps) * 100;
+            
+            detailsHtml += '<div style="margin-bottom: 15px;">';
+            detailsHtml += '<div style="font-weight: bold; margin-bottom: 5px;">🎯 Next: ' + nextAchievement.name + '</div>';
+            detailsHtml += '<div style="opacity: 0.8; margin-bottom: 5px;">' + stepsNeeded.toLocaleString() + ' steps to go</div>';
+            detailsHtml += '<div style="background: rgba(255,255,255,0.2); border-radius: 10px; height: 10px; overflow: hidden; margin-bottom: 5px;">';
+            detailsHtml += '<div style="background: #ffd700; height: 100%; width: ' + progress + '%;"></div>';
+            detailsHtml += '</div>';
+            
+            // Show rewards
+            const rewards = [];
+            if (nextAchievement.rewards.bonusCellsPerDay) rewards.push('+' + nextAchievement.rewards.bonusCellsPerDay + ' cells/day');
+            if (nextAchievement.rewards.discoveryEfficiency) rewards.push('+' + nextAchievement.rewards.discoveryEfficiency + '% discovery');
+            if (nextAchievement.rewards.trainingEfficiency) rewards.push('+' + nextAchievement.rewards.trainingEfficiency + '% training');
+            if (nextAchievement.rewards.clickPower) rewards.push('click power → ' + nextAchievement.rewards.clickPower);
+            if (nextAchievement.rewards.trainingRosterSlots) rewards.push('roster → ' + nextAchievement.rewards.trainingRosterSlots);
+            if (nextAchievement.rewards.releaseXpBonus) rewards.push('+' + nextAchievement.rewards.releaseXpBonus + '% release');
+            if (nextAchievement.rewards.experienceBankCap) {
+                const cap = nextAchievement.rewards.experienceBankCap === Infinity ? '∞' : nextAchievement.rewards.experienceBankCap;
+                rewards.push('XP bank → ' + cap);
+            }
+            
+            detailsHtml += '<div style="font-size: 11px; opacity: 0.7;">Rewards: ' + rewards.join(', ') + '</div>';
+            detailsHtml += '</div>';
+        } else if (totalSteps >= 3500000) {
+            // Show infinite progression
+            const nextInfinite = Math.ceil((totalSteps - 3500000) / 600000) * 600000 + 3500000;
+            const stepsNeeded = nextInfinite - totalSteps;
+            const progress = ((totalSteps - 3500000) % 600000) / 600000 * 100;
+            
+            detailsHtml += '<div style="margin-bottom: 15px;">';
+            detailsHtml += '<div style="font-weight: bold; margin-bottom: 5px;">♾️ Infinite Progression</div>';
+            detailsHtml += '<div style="opacity: 0.8; margin-bottom: 5px;">' + stepsNeeded.toLocaleString() + ' steps to next milestone</div>';
+            detailsHtml += '<div style="background: rgba(255,255,255,0.2); border-radius: 10px; height: 10px; overflow: hidden; margin-bottom: 5px;">';
+            detailsHtml += '<div style="background: #ffd700; height: 100%; width: ' + progress + '%;"></div>';
+            detailsHtml += '</div>';
+            detailsHtml += '<div style="font-size: 11px; opacity: 0.7;">Every 600K steps: +1 cell/day, +2% efficiency</div>';
+            detailsHtml += '</div>';
+        }
+        
+        // Show current bonuses breakdown
+        detailsHtml += '<div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 10px;">';
+        detailsHtml += '<div style="font-weight: bold; margin-bottom: 8px;">📊 Current Bonuses</div>';
+        
+        if (achievements.bonusCellsPerDay > 0) {
+            detailsHtml += '<div style="margin-bottom: 3px;">🎁 Daily Cells: +' + achievements.bonusCellsPerDay + ' per day</div>';
+        }
+        if (achievements.discoveryEfficiency > 0) {
+            const stepsPerCell = Math.round(1000 * (1 - achievements.discoveryEfficiency / 100));
+            detailsHtml += '<div style="margin-bottom: 3px;">⚡ Discovery: ' + stepsPerCell + ' steps/cell (' + achievements.discoveryEfficiency + '% bonus)</div>';
+        }
+        if (achievements.trainingEfficiency > 0) {
+            const stepsPerXP = Math.round(10 * (1 - achievements.trainingEfficiency / 100));
+            detailsHtml += '<div style="margin-bottom: 3px;">💪 Training: ' + stepsPerXP + ' steps/XP (' + achievements.trainingEfficiency + '% bonus)</div>';
+        }
+        if (achievements.clickPower > 1) {
+            detailsHtml += '<div style="margin-bottom: 3px;">🖱️ Click Power: x' + achievements.clickPower + ' multiplier</div>';
+        }
+        if (achievements.trainingRosterSlots > 10) {
+            detailsHtml += '<div style="margin-bottom: 3px;">👥 Roster Slots: ' + achievements.trainingRosterSlots + ' steplings</div>';
+        }
+        if (achievements.releaseXpBonus > 0) {
+            detailsHtml += '<div style="margin-bottom: 3px;">💎 Release Bonus: +' + achievements.releaseXpBonus + '% XP</div>';
+        }
+        if (achievements.experienceBankCap === Infinity) {
+            detailsHtml += '<div style="margin-bottom: 3px;">🏦 XP Bank: ∞ Unlimited</div>';
+        } else if (achievements.experienceBankCap > 100) {
+            detailsHtml += '<div style="margin-bottom: 3px;">🏦 XP Bank: ' + achievements.experienceBankCap + ' capacity</div>';
+        }
+        
+        detailsHtml += '</div>';
+        
+        // Show unlocked achievements
+        if (achievements.unlockedAchievements.length > 0) {
+            detailsHtml += '<div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 10px;">';
+            detailsHtml += '<div style="font-weight: bold; margin-bottom: 8px;">🏆 Unlocked (' + achievements.unlockedAchievements.length + ')</div>';
+            detailsHtml += '<div style="display: flex; flex-wrap: wrap; gap: 5px;">';
+            for (let i = 0; i < achievements.unlockedAchievements.length; i++) {
+                detailsHtml += '<span style="background: rgba(255,215,0,0.3); padding: 3px 8px; border-radius: 5px; font-size: 11px;">' + achievements.unlockedAchievements[i] + '</span>';
+            }
+            detailsHtml += '</div>';
+            detailsHtml += '</div>';
+        }
+        
+        detailsHtml += '</div>';
+        detailsEl.innerHTML = detailsHtml;
+    }
+}
+
+// Toggle achievement details
+function toggleAchievementDetails() {
+    const detailsEl = document.getElementById('achievement-details');
+    if (detailsEl) {
+        if (detailsEl.style.display === 'none') {
+            detailsEl.style.display = 'block';
+        } else {
+            detailsEl.style.display = 'none';
+        }
+    }
+}radius: 10px; height: 8px; overflow: hidden;">';
         html += '<div style="background: ' + tierColor + '; height: 100%; width: ' + p.progressPercent.toFixed(1) + '%; transition: width 0.3s ease;"></div>';
         html += '</div>';
         html += '</div>';
@@ -1446,19 +1791,31 @@ function updateDisplay() {
     document.getElementById('step-count').innerHTML = dailySteps + ' <small>(today)</small>';
     document.getElementById('cells').innerHTML = game.cells;
     document.getElementById('exp').innerHTML = game.experience;
-    document.getElementById('exp-bank').innerHTML = game.experienceBank;
+    document.getElementById('exp-bank').innerHTML = game.experienceBank + '/' + game.experienceBankCap;
+    document.getElementById('clicks').innerHTML = game.clicks;
     document.getElementById('glass').innerHTML = getTotalGlasses();
     
     // Update milestone progress
     updateMilestoneDisplay();
     
+    // Update achievement display
+    updateAchievementDisplay();
+    
     if (game.mode === 'discovery') {
+        // Show discovery efficiency in mode description
+        const efficiency = game.lifetimeAchievements.discoveryEfficiency || 0;
+        const stepsPerCell = Math.round(1000 * (1 - efficiency / 100));
+        const effText = efficiency > 0 ? ' (' + stepsPerCell + ' steps/cell)' : '';
         document.getElementById('mode-title').innerHTML = '🔍 Discovery Mode';
-        document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell (daily progress)';
+        document.getElementById('mode-desc').innerHTML = '1000 steps = 1 cell' + effText + ' (or 1000 clicks)';
     } else {
-        document.getElementById('mode-title').innerHTML = '💪 Training Mode';
+        // Show training efficiency in mode description
+        const efficiency = game.lifetimeAchievements.trainingEfficiency || 0;
+        const stepsPerXP = Math.round(10 * (1 - efficiency / 100));
+        const effText = efficiency > 0 ? ' (' + stepsPerXP + ' steps/XP)' : '';
         var bankText = game.experienceBank > 0 ? ' (+' + game.experienceBank + ' banked)' : '';
-        document.getElementById('mode-desc').innerHTML = '10 steps = 1 experience (' + game.trainingRoster.length + ' in roster' + bankText + ')';
+        document.getElementById('mode-title').innerHTML = '💪 Training Mode';
+        document.getElementById('mode-desc').innerHTML = '10 steps = 1 XP' + effText + ' (or 10 clicks) - ' + game.trainingRoster.length + ' in roster' + bankText;
     }
     
     var inspectBtn = document.getElementById('inspect-btn');
@@ -1706,6 +2063,12 @@ function calculateReleaseValue(stepling) {
     
     var releaseValue = Math.floor(totalInvested * returnRate * fusionBonus * rarityBonus);
     
+    // Apply achievement release XP bonus
+    const achievementBonus = game.lifetimeAchievements.releaseXpBonus || 0;
+    if (achievementBonus > 0) {
+        releaseValue = Math.floor(releaseValue * (1 + achievementBonus / 100));
+    }
+    
     // Minimum return of 50 XP for any stepling
     return Math.max(50, releaseValue);
 }
@@ -1759,9 +2122,13 @@ async function releaseStepling(steplingId, expValue) {
         delete game.rosterOrder[steplingId];
         
         // Add experience to XP bank (not regular experience)
-        game.experienceBank += expValue;
+        const added = addToExperienceBank(expValue);
         
-        log('Released stepling for ' + expValue.toLocaleString() + ' XP! Added to XP bank.');
+        if (added < expValue) {
+            log('Released stepling for ' + expValue.toLocaleString() + ' XP! Banked ' + added + ' (bank full).');
+        } else {
+            log('Released stepling for ' + expValue.toLocaleString() + ' XP! Added to XP bank.');
+        }
         
         // Close details and refresh displays
         hideSteplingDetails();
@@ -1797,10 +2164,14 @@ function loadGame() {
             // Merge with default game object to ensure all properties exist
             game = Object.assign({
                 steps: 0,
+                dailySteps: 0,
+                lastStepDate: null,
+                clicks: 0,
                 mode: 'discovery',
                 cells: 0,
                 experience: 0,
                 experienceBank: 0,
+                experienceBankCap: 100,
                 magnifyingGlass: { uncommon: 0, rare: 0, epic: 0, legendary: 0 },
                 discoveredSpecies: [],
                 milestonesReached: [],
@@ -1808,7 +2179,18 @@ function loadGame() {
                 rosterOrder: {},
                 fusionSlot1: null,
                 fusionSlot2: null,
-                activeFusionSlot: 1
+                activeFusionSlot: 1,
+                selectedGlassTier: null,
+                lifetimeAchievements: {
+                    bonusCellsPerDay: 0,
+                    discoveryEfficiency: 0,
+                    trainingEfficiency: 0,
+                    clickPower: 1,
+                    experienceBankCap: 100,
+                    trainingRosterSlots: 10,
+                    releaseXpBonus: 0,
+                    unlockedAchievements: []
+                }
             }, loadedGame);
             
             // Migrate old magnifying glass format (number) to new format (object)
@@ -1895,19 +2277,40 @@ async function initializeGoogleFit() {
                         this.accessToken = savedToken;
                         log('✅ Restored Google Fit session');
                         updateGoogleFitStatus(true);
+                        
+                        // If token expires in less than 5 minutes, try to refresh it silently
+                        if (expiry - now < 5 * 60 * 1000) {
+                            log('🔄 Token expiring soon, attempting silent refresh...');
+                            this.requestPermission(true).catch(() => {
+                                log('Silent refresh failed, will need manual reconnect');
+                            });
+                        }
+                        
                         return true;
                     } else {
-                        // Token expired, clear it
+                        // Token expired, try silent refresh first
                         localStorage.removeItem('googleFitToken');
                         localStorage.removeItem('googleFitTokenExpiry');
-                        log('🔄 Google Fit token expired, please reconnect');
+                        log('🔄 Token expired, attempting silent refresh...');
+                        
+                        try {
+                            const refreshed = await this.requestPermission(true);
+                            if (refreshed) {
+                                log('✅ Token refreshed silently');
+                                return true;
+                            } else {
+                                log('Silent refresh failed, please reconnect manually');
+                            }
+                        } catch (error) {
+                            log('Silent refresh error: ' + error.message);
+                        }
                     }
                 }
                 
                 return true;
             },
             
-            async requestPermission() {
+            async requestPermission(silent = false) {
                 if (!this.initialized) {
                     await this.initialize();
                 }
@@ -1919,6 +2322,7 @@ async function initializeGoogleFit() {
                     const tokenClient = window.google.accounts.oauth2.initTokenClient({
                         client_id: CLIENT_ID,
                         scope: SCOPES,
+                        prompt: silent ? '' : 'consent', // Empty prompt allows silent refresh if user previously consented
                         callback: (tokenResponse) => {
                             if (tokenResponse.access_token) {
                                 this.accessToken = tokenResponse.access_token;
@@ -1928,21 +2332,33 @@ async function initializeGoogleFit() {
                                 localStorage.setItem('googleFitToken', tokenResponse.access_token);
                                 localStorage.setItem('googleFitTokenExpiry', expiryTime.toString());
                                 
-                                log('✅ Successfully connected to Google Fit!');
+                                if (!silent) {
+                                    log('✅ Successfully connected to Google Fit!');
+                                }
                                 updateGoogleFitStatus(true);
                                 resolve(true);
                             } else {
-                                reject(new Error('No access token received'));
+                                if (silent) {
+                                    // Silent refresh failed, need user interaction
+                                    resolve(false);
+                                } else {
+                                    reject(new Error('No access token received'));
+                                }
                             }
                         },
                         error_callback: (error) => {
-                            log('❌ Failed to connect to Google Fit: ' + error.error);
-                            updateGoogleFitStatus(false);
-                            reject(error);
+                            if (silent) {
+                                // Silent refresh failed, need user interaction
+                                resolve(false);
+                            } else {
+                                log('❌ Failed to connect to Google Fit: ' + error.error);
+                                updateGoogleFitStatus(false);
+                                reject(error);
+                            }
                         }
                     });
                     
-                    tokenClient.requestAccessToken();
+                    tokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
                 });
             },
             
@@ -1997,13 +2413,26 @@ async function initializeGoogleFit() {
 
                     return totalSteps;
                 } catch (error) {
-                    // If token is invalid, clear it and require re-auth
+                    // If token is invalid, try silent refresh
                     if (error.status === 401 || error.status === 403) {
+                        log('🔄 Token expired, attempting silent refresh...');
                         this.accessToken = null;
                         localStorage.removeItem('googleFitToken');
                         localStorage.removeItem('googleFitTokenExpiry');
-                        updateGoogleFitStatus(false);
-                        throw new Error('Google Fit session expired - please reconnect');
+                        
+                        try {
+                            const refreshed = await this.requestPermission(true);
+                            if (refreshed) {
+                                // Retry the request with new token
+                                return await this.getCurrentSteps();
+                            } else {
+                                updateGoogleFitStatus(false);
+                                throw new Error('Google Fit session expired - please reconnect');
+                            }
+                        } catch (refreshError) {
+                            updateGoogleFitStatus(false);
+                            throw new Error('Google Fit session expired - please reconnect');
+                        }
                     }
                     throw error;
                 }
@@ -2094,27 +2523,38 @@ async function loadGoogleFitData() {
         if (stepDifference > 0) {
             log('🔄 Synced ' + stepDifference + ' new steps from Google Fit!');
             
-            // Process the new steps for game mechanics
+            // Process the new steps for game mechanics with efficiency bonuses
             if (game.mode === 'discovery') {
-                const oldCells = Math.floor(oldDailySteps / 1000);
-                const newCells = Math.floor(totalStepsToday / 1000);
+                // Apply discovery efficiency (reduces steps needed per cell)
+                const efficiency = game.lifetimeAchievements.discoveryEfficiency || 0;
+                const stepsPerCell = Math.round(1000 * (1 - efficiency / 100));
+                
+                const oldCells = Math.floor(oldDailySteps / stepsPerCell);
+                const newCells = Math.floor(totalStepsToday / stepsPerCell);
                 const cellsToAdd = newCells - oldCells;
                 if (cellsToAdd > 0) {
                     game.cells += cellsToAdd;
-                    log('💎 Earned ' + cellsToAdd + ' cells from sync!');
+                    const efficiencyText = efficiency > 0 ? ' (+' + efficiency + '% efficiency)' : '';
+                    log('💎 Earned ' + cellsToAdd + ' cells from sync!' + efficiencyText);
                 }
             } else {
-                const oldExp = Math.floor(oldDailySteps / 10);
-                const newExp = Math.floor(totalStepsToday / 10);
+                // Apply training efficiency (reduces steps needed per XP)
+                const efficiency = game.lifetimeAchievements.trainingEfficiency || 0;
+                const stepsPerXP = Math.round(10 * (1 - efficiency / 100));
+                
+                const oldExp = Math.floor(oldDailySteps / stepsPerXP);
+                const newExp = Math.floor(totalStepsToday / stepsPerXP);
                 const expToAdd = newExp - oldExp;
                 if (expToAdd > 0) {
                     game.experience += expToAdd;
-                    log('⭐ Earned ' + expToAdd + ' experience from sync!');
+                    const efficiencyText = efficiency > 0 ? ' (+' + efficiency + '% efficiency)' : '';
+                    log('⭐ Earned ' + expToAdd + ' experience from sync!' + efficiencyText);
                     distributeExperienceToRoster(expToAdd);
                 }
             }
             
             checkMilestones();
+            checkNewAchievements();
             updateDisplay();
             saveGame();
         } else if (stepDifference < 0) {

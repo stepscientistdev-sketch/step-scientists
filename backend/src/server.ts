@@ -12,6 +12,7 @@ import authRoutes from './routes/authRoutes';
 import playerRoutes from './routes/playerRoutes';
 import gameRoutes from './routes/gameRoutes';
 import syncRoutes from './routes/syncRoutes';
+import lifetimeAchievementRoutes from './routes/lifetimeAchievementRoutes';
 // import steplingRoutes from './routes/steplingRoutes'; // Temporarily disabled due to auth issues
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
@@ -688,6 +689,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/achievements', lifetimeAchievementRoutes);
 // app.use('/api/steplings', steplingRoutes); // Temporarily disabled due to auth issues
 
 // 404 handler

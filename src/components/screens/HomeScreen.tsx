@@ -15,15 +15,25 @@ import {
   switchGameMode,
   updateStepsInMode,
   clearPendingMilestones,
+  addResources,
 } from '@/store/slices/gameSlice';
 import {
   requestStepPermission,
   getCurrentSteps,
   startStepTracking,
 } from '@/store/slices/stepCounterSlice';
+import {
+  fetchAchievements,
+  updateAchievements,
+  claimDailyBonus,
+  clearNewlyUnlocked,
+} from '@/store/slices/lifetimeAchievementSlice';
 import {GameMode} from '@/types';
 import MilestoneProgress from '@/components/MilestoneProgress';
 import MagnifyingGlassInventory from '@/components/MagnifyingGlassInventory';
+import {AchievementBonuses} from '@/components/AchievementBonuses';
+import {AchievementProgress} from '@/components/AchievementProgress';
+import {AchievementUnlockModal} from '@/components/AchievementUnlockModal';
 import {stepTrackingIntegration} from '@/services/stepTrackingIntegration';
 
 interface Props {
@@ -43,13 +53,63 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     loading: gameLoading,
   } = useSelector((state: RootState) => state.game);
   const {stepData, permissionGranted, isTracking} = useSelector((state: RootState) => state.stepCounter);
+  const {
+    achievements,
+    newlyUnlocked,
+    dailyBonusClaimed,
+  } = useSelector((state: RootState) => state.lifetimeAchievement);
 
   const [showMilestones, setShowMilestones] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
+  const [lastDailyCheck, setLastDailyCheck] = useState<string | null>(null);
 
   useEffect(() => {
     initializeApp();
   }, []);
+
+  // Update achievements when total steps change
+  useEffect(() => {
+    if (stepData.totalSteps > 0 && achievements) {
+      dispatch(updateAchievements(stepData.totalSteps));
+    }
+  }, [stepData.totalSteps]);
+
+  // Check for daily bonus on app start and periodically
+  useEffect(() => {
+    checkDailyBonus();
+    
+    // Check every hour
+    const interval = setInterval(checkDailyBonus, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkDailyBonus = async () => {
+    const today = new Date().toDateString();
+    
+    if (lastDailyCheck !== today && !dailyBonusClaimed) {
+      setLastDailyCheck(today);
+      
+      try {
+        const result = await dispatch(claimDailyBonus()).unwrap();
+        
+        if (result && result.claimed && result.bonusCells > 0) {
+          // Add bonus cells to resources
+          dispatch(addResources({
+            cells: result.bonusCells,
+            experiencePoints: 0,
+          }));
+          
+          Alert.alert(
+            '🎁 Daily Bonus!',
+            `You received ${result.bonusCells} bonus cells from your lifetime achievements!`,
+            [{text: 'Awesome!'}]
+          );
+        }
+      } catch (error) {
+        console.error('Failed to claim daily bonus:', error);
+      }
+    }
+  };
 
   useEffect(() => {
     // Show milestone notifications
@@ -79,6 +139,9 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
     try {
       // Initialize game data first
       await dispatch(initializeGameData()).unwrap();
+      
+      // Initialize achievements
+      await dispatch(fetchAchievements()).unwrap();
       
       // Then initialize step tracking
       await initializeStepTracking();
@@ -188,6 +251,16 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
           </Text>
         </View>
       </View>
+
+      {/* Lifetime Achievements */}
+      {achievements && (
+        <>
+          <AchievementBonuses achievements={achievements} />
+          <View style={styles.card}>
+            <AchievementProgress totalSteps={stepData.totalSteps} />
+          </View>
+        </>
+      )}
 
       {/* Game Mode Selection */}
       <View style={styles.card}>
@@ -303,6 +376,13 @@ const HomeScreen: React.FC<Props> = ({navigation}) => {
       <MagnifyingGlassInventory
         visible={showInventory}
         onClose={() => setShowInventory(false)}
+      />
+
+      {/* Achievement Unlock Modal */}
+      <AchievementUnlockModal
+        visible={newlyUnlocked.length > 0}
+        achievements={newlyUnlocked}
+        onClose={() => dispatch(clearNewlyUnlocked())}
       />
     </ScrollView>
   );

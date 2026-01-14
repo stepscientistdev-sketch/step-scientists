@@ -255,3 +255,55 @@ export interface SyncConflictModel {
   resolved_at?: Date;
   created_at: Date;
 }
+
+// Lifetime Achievement types
+export interface LifetimeAchievement {
+  id: string;
+  player_id: string;
+  bonus_cells_per_day: number;
+  discovery_efficiency: number;
+  training_efficiency: number;
+  click_power: number;
+  experience_bank_cap: number;
+  training_roster_slots: number;
+  release_xp_bonus: number;
+  unlocked_achievements: string[];
+  last_daily_bonus_claim: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface LifetimeAchievementModel {
+  id: string;
+  player_id: string;
+  bonus_cells_per_day: number;
+  discovery_efficiency: number;
+  training_efficiency: number;
+  click_power: number;
+  experience_bank_cap: number;
+  training_roster_slots: number;
+  release_xp_bonus: number;
+  unlocked_achievements: string; // JSON string
+  last_daily_bonus_claim: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AchievementDefinition {
+  steps: number;
+  name: string;
+  rewards: {
+    bonusCellsPerDay?: number;
+    discoveryEfficiency?: number;
+    trainingEfficiency?: number;
+    clickPower?: number;
+    experienceBankCap?: number;
+    trainingRosterSlots?: number;
+    releaseXpBonus?: number;
+  };
+}
+
+export interface AchievementUnlockResult {
+  newAchievements: AchievementDefinition[];
+  updatedBonuses: LifetimeAchievement;
+}

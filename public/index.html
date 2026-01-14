@@ -210,6 +210,10 @@
                 <div class="resource-label">XP Bank</div>
             </div>
             <div class="resource">
+                <div id="clicks" class="resource-value">0</div>
+                <div class="resource-label">🖱️ Clicks</div>
+            </div>
+            <div class="resource">
                 <div id="glass" class="resource-value">0</div>
                 <div class="resource-label">🔍 Glass</div>
                 <button onclick="showGlassInventory()" style="font-size: 10px; padding: 2px 6px; margin-top: 2px; background: rgba(255,255,255,0.2); border: none; border-radius: 3px; color: white;">View</button>
@@ -224,8 +228,19 @@
             </div>
         </div>
         
+        <!-- Achievement Progress Display -->
+        <div id="achievement-progress" class="section" style="background: rgba(255,215,0,0.15); border-radius: 15px; padding: 15px; margin-bottom: 20px; cursor: pointer;" onclick="toggleAchievementDetails()">
+            <h3 style="margin-bottom: 10px; text-align: center; font-size: 16px;">🏆 Lifetime Achievements</h3>
+            <div id="achievement-summary" style="text-align: center; font-size: 14px; margin-bottom: 10px;">
+                <!-- Achievement summary will be populated here -->
+            </div>
+            <div id="achievement-details" style="display: none; margin-top: 15px; font-size: 12px;">
+                <!-- Detailed achievement info will be populated here -->
+            </div>
+        </div>
+        
         <div class="buttons">
-            <button class="btn btn-primary" onclick="addSteps()">+100 Steps</button>
+            <button class="btn btn-primary" onclick="addClick()">🖱️ Click (+1)</button>
             <button class="btn btn-secondary" onclick="switchMode()">Switch Mode</button>
             <button class="btn" onclick="inspectCell()" id="inspect-btn">Inspect Cell</button>
             <button class="btn" onclick="toggleMagnifyingGlass()" id="glass-btn">Use 🔍 Glass</button>

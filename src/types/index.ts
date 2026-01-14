@@ -80,6 +80,42 @@ export interface MagnifyingGlass {
   advancementRange: [number, number];
 }
 
+// Lifetime Achievement types
+export interface LifetimeAchievement {
+  id: string;
+  playerId: string;
+  bonusCellsPerDay: number;
+  discoveryEfficiency: number;
+  trainingEfficiency: number;
+  clickPower: number;
+  experienceBankCap: number;
+  trainingRosterSlots: number;
+  releaseXpBonus: number;
+  unlockedAchievements: string[];
+  lastDailyBonusClaim: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AchievementDefinition {
+  steps: number;
+  name: string;
+  rewards: {
+    bonusCellsPerDay?: number;
+    discoveryEfficiency?: number;
+    trainingEfficiency?: number;
+    clickPower?: number;
+    experienceBankCap?: number;
+    trainingRosterSlots?: number;
+    releaseXpBonus?: number;
+  };
+}
+
+export interface AchievementUnlockResult {
+  newAchievements: AchievementDefinition[];
+  updatedBonuses: LifetimeAchievement;
+}
+
 // Step tracking and sync types
 export interface OfflineStepData {
   date: Date;

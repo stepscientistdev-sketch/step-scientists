@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GameMode, Resources, MagnifyingGlass, RarityTier } from '../types';
 import { steplingService } from './steplingService';
+import { lifetimeAchievementService } from './lifetimeAchievementService';
+import { store } from '../store';
 
 export interface GameModeData {
   mode: GameMode;
@@ -169,10 +171,20 @@ class GameServiceImpl {
   calculateResourcesFromSteps(steps: number, mode: GameMode): Resources {
     const resources: Resources = { cells: 0, experiencePoints: 0 };
 
+    // Get achievement bonuses from Redux store
+    const state = store.getState();
+    const achievements = state.lifetimeAchievement.achievements;
+
     if (mode === GameMode.DISCOVERY) {
-      resources.cells = Math.floor(steps / CONVERSION_RATES.DISCOVERY.STEPS_PER_CELL);
+      const stepsPerCell = achievements 
+        ? lifetimeAchievementService.getDiscoveryStepsRequired(achievements.discoveryEfficiency)
+        : CONVERSION_RATES.DISCOVERY.STEPS_PER_CELL;
+      resources.cells = Math.floor(steps / stepsPerCell);
     } else if (mode === GameMode.TRAINING) {
-      resources.experiencePoints = Math.floor(steps / CONVERSION_RATES.TRAINING.STEPS_PER_XP);
+      const stepsPerXP = achievements
+        ? lifetimeAchievementService.getTrainingStepsRequired(achievements.trainingEfficiency)
+        : CONVERSION_RATES.TRAINING.STEPS_PER_XP;
+      resources.experiencePoints = Math.floor(steps / stepsPerXP);
     }
 
     return resources;
