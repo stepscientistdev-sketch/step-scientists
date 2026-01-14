@@ -93,6 +93,7 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    version: '1.0.1'
   });
 });
 

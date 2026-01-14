@@ -3,10 +3,15 @@
  * @returns { Promise<void> } 
  */
 exports.seed = async function(knex) {
-  // Deletes ALL existing entries
-  await knex('species').del();
+  // Check if species already exist
+  const existingSpecies = await knex('species').count('* as count').first();
+  
+  if (parseInt(existingSpecies.count) > 0) {
+    console.log('Species already exist, skipping seed');
+    return;
+  }
 
-  // Insert initial species data
+  // Insert initial species data only if none exist
   await knex('species').insert([
     // Common tier species (2-3 species)
     {

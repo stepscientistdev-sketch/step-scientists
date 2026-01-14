@@ -115,8 +115,13 @@ async function testConnection() {
     statusEl.className = 'connection-status connecting';
     
     try {
-        var response = await fetch(API_BASE + '/health');
-        var data = await response.json();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for wake-up
+        
+        var response = await fetch(API_BASE + '/health', {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
         
         if (response.ok) {
             statusEl.textContent = '✅ Connected';
@@ -127,10 +132,34 @@ async function testConnection() {
             throw new Error('Server error');
         }
     } catch (error) {
-        statusEl.textContent = '❌ Offline';
-        statusEl.className = 'connection-status disconnected';
-        isConnected = false;
-        log('Offline mode');
+        if (error.name === 'AbortError') {
+            statusEl.textContent = '⏰ Backend is waking up... (may take 60s)';
+            statusEl.className = 'connection-status connecting';
+            log('Backend is waking up from sleep...');
+            
+            // Retry after a delay
+            setTimeout(async () => {
+                try {
+                    const retryResponse = await fetch(API_BASE + '/health');
+                    if (retryResponse.ok) {
+                        statusEl.textContent = '✅ Connected';
+                        statusEl.className = 'connection-status connected';
+                        isConnected = true;
+                        log('Backend is now awake!');
+                    }
+                } catch (retryError) {
+                    statusEl.textContent = '❌ Offline';
+                    statusEl.className = 'connection-status disconnected';
+                    isConnected = false;
+                    log('Could not connect to backend');
+                }
+            }, 5000);
+        } else {
+            statusEl.textContent = '❌ Offline';
+            statusEl.className = 'connection-status disconnected';
+            isConnected = false;
+            log('Offline mode');
+        }
     }
 }
 
