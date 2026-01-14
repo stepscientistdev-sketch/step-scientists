@@ -1528,7 +1528,11 @@ function updateAchievementDisplay() {
             infiniteMilestones = Math.floor((totalSteps - 3500000) / 600000);
         }
         
-        let summaryText = '<div style="font-weight: bold; margin-bottom: 5px;">';
+        let summaryText = '<div style="font-weight: bold; margin-bottom: 8px; font-size: 16px; color: #ffd700;">';
+        summaryText += '🚶 ' + totalSteps.toLocaleString() + ' Total Steps';
+        summaryText += '</div>';
+        
+        summaryText += '<div style="font-weight: bold; margin-bottom: 5px;">';
         summaryText += unlockedCount + '/' + totalNamed + ' Named Achievements';
         if (infiniteMilestones > 0) {
             summaryText += ' + ' + infiniteMilestones + ' Infinite';
@@ -1559,6 +1563,12 @@ function updateAchievementDisplay() {
     const detailsEl = document.getElementById('achievement-details');
     if (detailsEl) {
         let detailsHtml = '<div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 12px;">';
+        
+        // Show total steps prominently at top of details
+        detailsHtml += '<div style="text-align: center; margin-bottom: 15px; padding: 10px; background: rgba(255,215,0,0.2); border-radius: 8px;">';
+        detailsHtml += '<div style="font-size: 24px; font-weight: bold; color: #ffd700; margin-bottom: 5px;">🚶 ' + totalSteps.toLocaleString() + '</div>';
+        detailsHtml += '<div style="font-size: 12px; opacity: 0.8;">Lifetime Steps</div>';
+        detailsHtml += '</div>';
         
         // Show next achievement
         let nextAchievement = null;
