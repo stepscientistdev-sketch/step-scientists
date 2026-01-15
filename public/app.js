@@ -3008,6 +3008,26 @@ function updateBattleEnergyDisplay() {
     }
 }
 
+async function debugGiveEnergy() {
+    try {
+        const response = await fetch(`${API_BASE}/debug/give-energy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert(`✅ Energy restored to ${result.energy.current}/${result.energy.max}!`);
+            await loadBattleData();
+        } else {
+            const error = await response.text();
+            alert(`❌ Failed to give energy: ${error}`);
+        }
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
 function displayBossTiers() {
     const container = document.getElementById('boss-tiers');
     if (!container) {
