@@ -64,11 +64,11 @@ export interface BattleResult {
 }
 
 const BOSS_TIERS = {
-  1: { hp: 5000, attack: 100, speed: 50, unlockTurn: 0 },
-  2: { hp: 15000, attack: 200, speed: 75, unlockTurn: 10 },
-  3: { hp: 45000, attack: 400, speed: 100, unlockTurn: 20 },
-  4: { hp: 135000, attack: 800, speed: 125, unlockTurn: 30 },
-  5: { hp: 405000, attack: 1600, speed: 150, unlockTurn: 40 }
+  1: { hp: 1000, attack: 1000, speed: 100, unlockTurn: 0 },
+  2: { hp: 3000, attack: 2000, speed: 150, unlockTurn: 10 },
+  3: { hp: 9000, attack: 4000, speed: 200, unlockTurn: 20 },
+  4: { hp: 27000, attack: 8000, speed: 250, unlockTurn: 30 },
+  5: { hp: 81000, attack: 16000, speed: 300, unlockTurn: 40 }
 };
 
 export class BattleService {
@@ -162,12 +162,10 @@ export class BattleService {
   
   /**
    * Calculate boss damage to stepling
-   * Attack/Defense ratio with minimum damage floor
+   * Simple Attack/Defense ratio
    */
   private calculateBossDamage(boss: Boss, target: Stepling): number {
-    const ratio = boss.currentAttack / Math.max(target.stats.defense, 1);
-    // Ensure boss does meaningful damage even early on
-    return Math.max(ratio, boss.currentAttack * 0.5);
+    return boss.currentAttack / target.stats.defense;
   }
   
   /**
