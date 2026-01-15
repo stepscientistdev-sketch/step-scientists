@@ -3218,7 +3218,9 @@ async function startBossBattle() {
         
         const teamIds = team.map(s => s.id);
         
-        alert(`DEBUG: Starting battle...\nAPI: ${API_BASE}/api/battle/start\nTeam: ${teamIds.length} steplings\nTier: ${selectedBossTier}`);
+        // Debug: Show what we're sending
+        const debugInfo = team.map(s => `${s.species_name || s.name} (ID: ${s.id.substring(0, 8)}...)`).join(', ');
+        alert(`DEBUG: Sending ${teamIds.length} steplings:\n${debugInfo}\nPlayer: ${MOBILE_PLAYER_ID.substring(0, 8)}...`);
         
         const response = await fetch(`${API_BASE}/api/battle/start`, {
             method: 'POST',
@@ -3231,11 +3233,9 @@ async function startBossBattle() {
             })
         });
         
-        alert(`DEBUG: Response status: ${response.status} ${response.statusText}`);
-        
         if (!response.ok) {
             const errorText = await response.text();
-            alert(`DEBUG: Error response:\n${errorText.substring(0, 200)}`);
+            alert(`DEBUG: Error response (${response.status}):\n${errorText.substring(0, 300)}`);
             
             let errorMsg = 'Unknown error';
             try {
@@ -3250,7 +3250,7 @@ async function startBossBattle() {
         }
         
         const startData = await response.json();
-        alert(`DEBUG: Battle started! Got response with ${JSON.stringify(Object.keys(startData))}`);
+        alert(`DEBUG: Battle started successfully!`);
         
         // Show battle in progress
         document.getElementById('battle-results').style.display = 'block';
@@ -3278,7 +3278,7 @@ async function startBossBattle() {
         
     } catch (error) {
         console.error('Battle error:', error);
-        alert(`Battle exception: ${error.message}\nStack: ${error.stack?.substring(0, 200)}`);
+        alert(`Battle exception: ${error.message}`);
     }
 }
 
