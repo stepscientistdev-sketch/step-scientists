@@ -2166,13 +2166,13 @@ function calculateReleaseValue(stepling) {
     // Fusion bonus - higher fusion levels get better return rates
     var fusionBonus = 1 + (stepling.fusion_level - 1) * 0.1; // +10% per fusion level
     
-    // Rarity bonus - 10x multiplier for each tier to reflect true scarcity
+    // Rarity bonus - matches actual catch rarity for balance
     var rarityBonuses = {
-        'common': 1,        // 1x (baseline)
-        'uncommon': 10,     // 10x (10x harder to get)
-        'rare': 100,        // 100x (100x harder to get)
-        'epic': 1000,       // 1000x (1000x harder to get)
-        'legendary': 10000  // 10000x (10000x harder to get)
+        'common': 1,           // 1x (baseline)
+        'uncommon': 100,       // 100x (100x rarer to catch)
+        'rare': 10000,         // 10,000x (10,000x rarer to catch)
+        'epic': 100000000,     // 100,000,000x (100M× rarer to catch)
+        'legendary': 10000000000  // 10,000,000,000x (10B× rarer to catch)
     };
     var rarityBonus = rarityBonuses[stepling.species?.rarity || 'common'] || 1;
     

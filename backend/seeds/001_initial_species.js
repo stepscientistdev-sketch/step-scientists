@@ -24,8 +24,8 @@ exports.seed = async function(knex) {
         attack: 50,
         defense: 40,
         speed: 30,
-        regen: 5,
-        lifesteal: 3
+        regen: 2,      // 2% HP regen per turn
+        lifesteal: 1   // 1% of damage as healing
       }),
       abilities: JSON.stringify([
         {
@@ -53,8 +53,8 @@ exports.seed = async function(knex) {
         attack: 30,
         defense: 80,
         speed: 20,
-        regen: 8,
-        lifesteal: 2
+        regen: 3,      // Tank with high regen
+        lifesteal: 0.5 // Low lifesteal (defensive, not offensive)
       }),
       abilities: JSON.stringify([
         {
@@ -80,12 +80,12 @@ exports.seed = async function(knex) {
       description: 'A fiery salamander that can generate small flames.',
       rarity_tier: 'uncommon',
       base_stats: JSON.stringify({
-        hp: 200,
-        attack: 120,
-        defense: 70,
-        speed: 90,
-        regen: 6,
-        lifesteal: 8
+        hp: 1500,      // 15x common (uncommon tier)
+        attack: 750,
+        defense: 600,
+        speed: 450,
+        regen: 1.5,    // Lower regen (glass cannon)
+        lifesteal: 2.5 // High lifesteal (offensive sustain)
       }),
       abilities: JSON.stringify([
         {
@@ -115,12 +115,12 @@ exports.seed = async function(knex) {
       description: 'A beautiful beetle with crystalline wings that refract light.',
       rarity_tier: 'uncommon',
       base_stats: JSON.stringify({
-        hp: 180,
-        attack: 90,
-        defense: 130,
-        speed: 60,
-        regen: 7,
-        lifesteal: 5
+        hp: 1350,      // 15x common (uncommon tier)
+        attack: 450,
+        defense: 1200,
+        speed: 300,
+        regen: 2,      // Balanced regen
+        lifesteal: 1.5 // Moderate lifesteal
       }),
       abilities: JSON.stringify([
         {
@@ -152,12 +152,12 @@ exports.seed = async function(knex) {
       description: 'A majestic eagle that commands the power of storms.',
       rarity_tier: 'rare',
       base_stats: JSON.stringify({
-        hp: 300,
-        attack: 200,
-        defense: 150,
-        speed: 250,
-        regen: 10,
-        lifesteal: 12
+        hp: 15000,     // 50x common (rare tier)
+        attack: 10000,
+        defense: 7500,
+        speed: 12500,
+        regen: 3,      // High regen (legendary sustain)
+        lifesteal: 3   // High lifesteal (legendary power)
       }),
       abilities: JSON.stringify([
         {

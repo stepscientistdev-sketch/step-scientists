@@ -23,8 +23,8 @@ exports.up = async function(knex) {
           attack: 50,
           defense: 40,
           speed: 30,
-          regen: 5,
-          lifesteal: 3
+          regen: 2,
+          lifesteal: 1
         };
         break;
       case 'Pebble Turtle':
@@ -33,38 +33,38 @@ exports.up = async function(knex) {
           attack: 30,
           defense: 80,
           speed: 20,
-          regen: 8,
-          lifesteal: 2
+          regen: 3,
+          lifesteal: 0.5
         };
         break;
       case 'Flame Salamander':
         newStats = {
-          hp: 200,
-          attack: 120,
-          defense: 70,
-          speed: 90,
-          regen: 6,
-          lifesteal: 8
+          hp: 1500,
+          attack: 750,
+          defense: 600,
+          speed: 450,
+          regen: 1.5,
+          lifesteal: 2.5
         };
         break;
       case 'Crystal Beetle':
         newStats = {
-          hp: 180,
-          attack: 90,
-          defense: 130,
-          speed: 60,
-          regen: 7,
-          lifesteal: 5
+          hp: 1350,
+          attack: 450,
+          defense: 1200,
+          speed: 300,
+          regen: 2,
+          lifesteal: 1.5
         };
         break;
       case 'Storm Eagle':
         newStats = {
-          hp: 300,
-          attack: 200,
-          defense: 150,
-          speed: 250,
-          regen: 10,
-          lifesteal: 12
+          hp: 15000,
+          attack: 10000,
+          defense: 7500,
+          speed: 12500,
+          regen: 3,
+          lifesteal: 3
         };
         break;
       default:
