@@ -3281,6 +3281,7 @@ async function startBossBattle() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                playerId: MOBILE_PLAYER_ID,
                 battleState: startData.initialState
             })
         });
