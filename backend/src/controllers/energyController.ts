@@ -8,7 +8,7 @@ export class EnergyController {
    */
   async getEnergy(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.id || req.query.playerId as string;
+      const playerId = req.user?.playerId || req.query.playerId as string;
       if (!playerId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -35,7 +35,7 @@ export class EnergyController {
    */
   async updateEnergy(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.id || req.body.playerId;
+      const playerId = req.user?.playerId || req.body.playerId;
       if (!playerId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;

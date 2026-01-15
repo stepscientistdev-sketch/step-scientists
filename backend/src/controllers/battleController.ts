@@ -9,7 +9,7 @@ export class BattleController {
    */
   async startBattle(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       if (!playerId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -73,7 +73,7 @@ export class BattleController {
    */
   async simulateBattle(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       if (!playerId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -105,7 +105,7 @@ export class BattleController {
    */
   async getProgress(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.id;
+      const playerId = req.user?.playerId;
       if (!playerId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
