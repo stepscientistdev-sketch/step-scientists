@@ -309,3 +309,15 @@ export interface AchievementUnlockResult {
   newAchievements: AchievementDefinition[];
   updatedBonuses: LifetimeAchievement;
 }
+
+// Express Request extension
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        username: string;
+      };
+    }
+  }
+}

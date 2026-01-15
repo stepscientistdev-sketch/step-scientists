@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { database as db } from '../config/database';
 
 export interface Boss {
   tier: number;
