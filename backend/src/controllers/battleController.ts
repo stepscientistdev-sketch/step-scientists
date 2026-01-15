@@ -9,17 +9,18 @@ export class BattleController {
    */
   async startBattle(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.playerId;
+      // Accept playerId from body for non-authenticated requests
+      const playerId = req.user?.playerId || req.body.playerId;
       if (!playerId) {
-        res.status(401).json({ error: 'Unauthorized' });
+        res.status(401).json({ error: 'Unauthorized - playerId required' });
         return;
       }
       
       const { teamIds, formation, bossTier } = req.body;
       
-      // Validate input
-      if (!Array.isArray(teamIds) || teamIds.length !== 10) {
-        res.status(400).json({ error: 'Team must have exactly 10 steplings' });
+      // Validate input - allow 1-10 steplings
+      if (!Array.isArray(teamIds) || teamIds.length === 0 || teamIds.length > 10) {
+        res.status(400).json({ error: 'Team must have 1-10 steplings' });
         return;
       }
       
@@ -73,9 +74,9 @@ export class BattleController {
    */
   async simulateBattle(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.playerId;
+      const playerId = req.user?.playerId || req.body.playerId;
       if (!playerId) {
-        res.status(401).json({ error: 'Unauthorized' });
+        res.status(401).json({ error: 'Unauthorized - playerId required' });
         return;
       }
       
@@ -105,9 +106,9 @@ export class BattleController {
    */
   async getProgress(req: Request, res: Response): Promise<void> {
     try {
-      const playerId = req.user?.playerId;
+      const playerId = req.user?.playerId || req.query.playerId as string;
       if (!playerId) {
-        res.status(401).json({ error: 'Unauthorized' });
+        res.status(401).json({ error: 'Unauthorized - playerId required' });
         return;
       }
       
