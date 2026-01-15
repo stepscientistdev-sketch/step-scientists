@@ -2973,14 +2973,14 @@ async function loadBattleData() {
         
         // Add visible debug info
         const tierContainer = document.getElementById('boss-tiers');
-        const teamContainer = document.getElementById('battle-team-list');
+        const frontRow = document.getElementById('front-row');
         
         if (!tierContainer) {
             alert('ERROR: boss-tiers container not found!');
             return;
         }
-        if (!teamContainer) {
-            alert('ERROR: battle-team-list container not found!');
+        if (!frontRow) {
+            alert('ERROR: front-row container not found!');
             return;
         }
         
