@@ -163,6 +163,43 @@ app.post('/debug/create-mobile-player', async (req, res) => {
   }
 });
 
+// Debug endpoint to give energy to mobile player
+app.post('/debug/give-energy', async (req, res) => {
+  try {
+    const playerId = MOBILE_PLAYER_ID;
+    
+    // Update player energy to max
+    await database('players')
+      .where('id', playerId)
+      .update({
+        energy_current: 10,
+        energy_last_regen_time: database.fn.now()
+      });
+    
+    // Get updated energy
+    const player = await database('players')
+      .where('id', playerId)
+      .select('energy_current', 'energy_max')
+      .first();
+    
+    res.json({
+      success: true,
+      message: 'Energy restored!',
+      energy: {
+        current: player.energy_current,
+        max: player.energy_max
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to give energy',
+      message: error.message
+    });
+  }
+});
+
 // Debug endpoint to inspect database state
 app.get('/debug/database', async (req, res) => {
   try {
