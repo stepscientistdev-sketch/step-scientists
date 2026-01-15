@@ -520,10 +520,28 @@
                 
                 <!-- Team Selection -->
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 10px 0;">Select Team (10 Steplings):</h4>
-                    <div style="font-size: 12px; margin-bottom: 10px;">Selected: <span id="battle-team-count">0</span>/10</div>
-                    <div id="battle-team-list" style="max-height: 300px; overflow-y: auto;">
-                        <!-- Steplings will be populated here -->
+                    <h4 style="margin: 10px 0;">Select Team Formation:</h4>
+                    <div style="font-size: 11px; margin-bottom: 10px; opacity: 0.8;">Tap empty slots to assign steplings</div>
+                    
+                    <!-- Formation Grid -->
+                    <div style="margin-bottom: 15px;">
+                        <!-- Front Row (3) -->
+                        <div style="font-size: 10px; opacity: 0.6; margin-bottom: 3px;">Front Row</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px;" id="front-row">
+                            <!-- Positions 0, 1, 2 -->
+                        </div>
+                        
+                        <!-- Middle Row (3) -->
+                        <div style="font-size: 10px; opacity: 0.6; margin-bottom: 3px;">Middle Row</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px;" id="middle-row">
+                            <!-- Positions 3, 4, 5 -->
+                        </div>
+                        
+                        <!-- Back Row (4) -->
+                        <div style="font-size: 10px; opacity: 0.6; margin-bottom: 3px;">Back Row</div>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;" id="back-row">
+                            <!-- Positions 6, 7, 8, 9 -->
+                        </div>
                     </div>
                 </div>
                 

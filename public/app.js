@@ -2948,7 +2948,7 @@ function forceCacheRefresh() {
 // ===== BATTLE SYSTEM =====
 
 let battleEnergy = { current: 10, max: 10 };
-let selectedBattleTeam = [];
+let battleFormation = [null, null, null, null, null, null, null, null, null, null]; // 10 positions
 let selectedBossTier = 1;
 
 async function viewBattle() {
@@ -3055,86 +3055,139 @@ function selectBossTier(tier) {
 }
 
 function displayBattleTeamSelection() {
-    console.log('displayBattleTeamSelection called');
-    const container = document.getElementById('battle-team-list');
-    console.log('battle-team-list container:', container);
-    console.log('playerSteplings:', playerSteplings);
-    if (!container || !playerSteplings || playerSteplings.length === 0) {
-        if (container) container.innerHTML = '<p style="text-align: center; opacity: 0.6;">No steplings available. Catch some first!</p>';
+    displayFormationGrid();
+}
+
+function displayFormationGrid() {
+    const frontRow = document.getElementById('front-row');
+    const middleRow = document.getElementById('middle-row');
+    const backRow = document.getElementById('back-row');
+    
+    if (!frontRow || !middleRow || !backRow) return;
+    
+    // Front row (positions 0-2)
+    frontRow.innerHTML = [0, 1, 2].map(pos => createPositionSlot(pos)).join('');
+    
+    // Middle row (positions 3-5)
+    middleRow.innerHTML = [3, 4, 5].map(pos => createPositionSlot(pos)).join('');
+    
+    // Back row (positions 6-9)
+    backRow.innerHTML = [6, 7, 8, 9].map(pos => createPositionSlot(pos)).join('');
+    
+    updateBattleButton();
+}
+
+function createPositionSlot(position) {
+    const stepling = battleFormation[position];
+    
+    if (stepling) {
+        const name = stepling.species_name || stepling.name || 'Unknown';
+        const level = stepling.level || stepling.current_level || 1;
+        
+        return `
+            <div onclick="selectSteplingForPosition(${position})" 
+                 style="padding: 8px; background: rgba(76, 175, 80, 0.3); border-radius: 8px; cursor: pointer; text-align: center; min-height: 60px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 11px; font-weight: bold;">${name}</div>
+                <div style="font-size: 9px;">Lvl ${level}</div>
+                <div style="font-size: 8px; margin-top: 2px;">Tap to change</div>
+            </div>
+        `;
+    } else {
+        return `
+            <div onclick="selectSteplingForPosition(${position})" 
+                 style="padding: 8px; background: rgba(255,255,255,0.1); border-radius: 8px; cursor: pointer; text-align: center; min-height: 60px; display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(255,255,255,0.3);">
+                <div style="font-size: 20px;">+</div>
+            </div>
+        `;
+    }
+}
+
+function selectSteplingForPosition(position) {
+    if (!playerSteplings || playerSteplings.length === 0) {
+        alert('No steplings available!');
         return;
     }
     
-    container.innerHTML = playerSteplings.map(s => {
-        const isSelected = selectedBattleTeam.includes(s.id);
-        
-        // Handle different data structures
-        const name = s.species_name || s.name || 'Unknown';
-        const level = s.level || s.current_level || 1;
-        const fusionLevel = s.fusion_level || 0;
-        
-        // Get stats - handle both current_stats object and direct properties
-        const stats = s.current_stats || s;
-        const hp = stats.hp || stats.max_hp || 0;
-        const atk = stats.attack || stats.atk || 0;
-        const def = stats.defense || stats.def || 0;
-        const spd = stats.speed || stats.spd || 0;
-        
-        return `
-            <div onclick="toggleBattleTeamMember('${s.id}')" 
-                 style="padding: 10px; margin: 5px 0; background: ${isSelected ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)'}; 
-                        border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong>${name}</strong> (Lvl ${level}, F${fusionLevel})
-                    <br>
-                    <span style="font-size: 11px;">
-                        HP: ${hp} | ATK: ${atk} | DEF: ${def} | SPD: ${spd}
-                    </span>
-                </div>
-                <div style="font-size: 20px;">${isSelected ? '✓' : ''}</div>
-            </div>
-        `;
-    }).join('');
+    // Get available steplings (not already in formation)
+    const usedIds = battleFormation.filter(s => s).map(s => s.id);
+    const available = playerSteplings.filter(s => !usedIds.includes(s.id) || battleFormation[position]?.id === s.id);
     
-    updateBattleTeamCount();
-    console.log('Battle team rendered');
-}
-
-function toggleBattleTeamMember(steplingId) {
-    console.log('toggleBattleTeamMember called with:', steplingId);
-    const index = selectedBattleTeam.indexOf(steplingId);
-    
-    if (index > -1) {
-        selectedBattleTeam.splice(index, 1);
-    } else {
-        if (selectedBattleTeam.length >= 10) {
-            alert('Maximum 10 steplings allowed!');
-            return;
-        }
-        selectedBattleTeam.push(steplingId);
+    if (available.length === 0) {
+        alert('All steplings are already assigned!');
+        return;
     }
     
-    displayBattleTeamSelection();
+    // Show selection modal
+    showSteplingPicker(position, available);
 }
 
-function updateBattleTeamCount() {
-    const countEl = document.getElementById('battle-team-count');
+function showSteplingPicker(position, availableSteplings) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+    
+    const content = document.createElement('div');
+    content.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; padding: 20px; max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto;';
+    
+    content.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Select Stepling</h3>
+            <button onclick="this.closest('[style*=fixed]').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; cursor: pointer; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">×</button>
+        </div>
+        ${battleFormation[position] ? `<button onclick="removeFromPosition(${position}); this.closest('[style*=fixed]').remove();" style="width: 100%; padding: 10px; background: rgba(244, 67, 54, 0.8); border: none; color: white; border-radius: 8px; margin-bottom: 10px; cursor: pointer;">Remove Stepling</button>` : ''}
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${availableSteplings.map(s => {
+                const name = s.species_name || s.name || 'Unknown';
+                const level = s.level || s.current_level || 1;
+                const fusionLevel = s.fusion_level || 0;
+                const stats = s.current_stats || s;
+                const hp = stats.hp || stats.max_hp || 0;
+                const atk = stats.attack || stats.atk || 0;
+                
+                return `
+                    <div onclick="assignToPosition(${position}, '${s.id}'); this.closest('[style*=fixed]').remove();" 
+                         style="padding: 12px; background: rgba(255,255,255,0.15); border-radius: 8px; cursor: pointer;">
+                        <div style="font-weight: bold;">${name}</div>
+                        <div style="font-size: 11px;">Lvl ${level}, F${fusionLevel} | HP: ${hp} | ATK: ${atk}</div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+    
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+}
+
+function assignToPosition(position, steplingId) {
+    const stepling = playerSteplings.find(s => s.id === steplingId);
+    if (stepling) {
+        battleFormation[position] = stepling;
+        displayFormationGrid();
+    }
+}
+
+function removeFromPosition(position) {
+    battleFormation[position] = null;
+    displayFormationGrid();
+}
+
+function updateBattleButton() {
     const startBtn = document.getElementById('start-battle-btn');
-    
-    if (countEl) {
-        countEl.textContent = selectedBattleTeam.length;
-    }
+    const filledCount = battleFormation.filter(s => s !== null).length;
     
     if (startBtn) {
-        startBtn.disabled = selectedBattleTeam.length !== 10 || battleEnergy.current === 0;
+        startBtn.disabled = filledCount === 0 || battleEnergy.current === 0;
         startBtn.textContent = battleEnergy.current === 0 ? 'Not Enough Energy' : 
-                               selectedBattleTeam.length !== 10 ? `Select ${10 - selectedBattleTeam.length} More` : 
-                               'Start Battle';
+                               filledCount === 0 ? 'Select at least 1 Stepling' : 
+                               `Start Battle (${filledCount}/10)`;
     }
 }
 
 async function startBossBattle() {
-    if (selectedBattleTeam.length !== 10) {
-        alert('Select exactly 10 steplings!');
+    const team = battleFormation.filter(s => s !== null);
+    
+    if (team.length === 0) {
+        alert('Select at least 1 stepling!');
         return;
     }
     
@@ -3144,9 +3197,25 @@ async function startBossBattle() {
     }
     
     try {
-        // Auto-arrange formation (first 3 front, next 3 middle, last 4 back)
+        // Build formation with actual positions
         const formation = {
-            front: [0, 1, 2],
+            front: battleFormation.slice(0, 3).map((s, i) => s ? i : null).filter(i => i !== null),
+            middle: battleFormation.slice(3, 6).map((s, i) => s ? i + 3 : null).filter(i => i !== null),
+            back: battleFormation.slice(6, 10).map((s, i) => s ? i + 6 : null).filter(i => i !== null)
+        };
+        
+        const teamIds = team.map(s => s.id);
+        
+        const response = await fetch(`${API_BASE}/api/battle/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: MOBILE_PLAYER_ID,
+                teamIds,
+                formation,
+                bossTier: selectedBossTier
+            })
+        });
             middle: [3, 4, 5],
             back: [6, 7, 8, 9]
         };
