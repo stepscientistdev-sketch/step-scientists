@@ -220,14 +220,17 @@ function updateDailySteps(totalStepsFromGoogleFit) {
     // For Google Fit, the API already gives us today's steps
     // So we can directly use that value
     const oldDailySteps = game.dailySteps;
+    const stepDifference = totalStepsFromGoogleFit - oldDailySteps;
+    
     game.dailySteps = totalStepsFromGoogleFit;
     
-    // Also update the total lifetime steps for backward compatibility
-    if (totalStepsFromGoogleFit > game.steps) {
-        game.steps = totalStepsFromGoogleFit;
+    // Accumulate lifetime steps (add the difference, don't replace)
+    if (stepDifference > 0) {
+        game.steps += stepDifference;
+        log('📊 Lifetime steps: ' + game.steps + ' (+' + stepDifference + ')');
     }
     
-    return game.dailySteps - oldDailySteps; // Return the difference for processing
+    return stepDifference; // Return the difference for processing
 }
 
 function addManualSteps(stepsToAdd) {
