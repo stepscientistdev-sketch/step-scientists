@@ -2952,11 +2952,13 @@ let selectedBattleTeam = [];
 let selectedBossTier = 1;
 
 async function viewBattle() {
+    console.log('viewBattle called');
     showSection('battle-section');
     await loadBattleData();
 }
 
 async function loadBattleData() {
+    console.log('loadBattleData called');
     try {
         // Load energy
         const energyResponse = await fetch(`${API_BASE}/api/player/energy?playerId=${MOBILE_PLAYER_ID}`);
