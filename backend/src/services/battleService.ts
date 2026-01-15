@@ -387,8 +387,8 @@ export class BattleService {
           total_damage: result.totalDamage,
           score: result.score,
           gems_earned: result.gemsEarned,
-          team_snapshot: {}, // TODO: Add team data
-          battle_log: result.battleLog
+          team_snapshot: JSON.stringify({}), // TODO: Add team data
+          battle_log: JSON.stringify(result.battleLog)
         })
         .returning('*');
       
