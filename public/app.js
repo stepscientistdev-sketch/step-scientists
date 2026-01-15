@@ -3122,6 +3122,11 @@ function selectSteplingForPosition(position) {
 }
 
 function showSteplingPicker(position, availableSteplings) {
+    // Log the first stepling to see its structure
+    if (availableSteplings.length > 0) {
+        console.log('Sample stepling data:', JSON.stringify(availableSteplings[0], null, 2));
+    }
+    
     const modal = document.createElement('div');
     modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
     
@@ -3136,18 +3141,25 @@ function showSteplingPicker(position, availableSteplings) {
         ${battleFormation[position] ? `<button onclick="removeFromPosition(${position}); this.closest('[style*=fixed]').remove();" style="width: 100%; padding: 10px; background: rgba(244, 67, 54, 0.8); border: none; color: white; border-radius: 8px; margin-bottom: 10px; cursor: pointer;">Remove Stepling</button>` : ''}
         <div style="display: flex; flex-direction: column; gap: 8px;">
             ${availableSteplings.map(s => {
-                const name = s.species_name || s.name || 'Unknown';
-                const level = s.level || s.current_level || 1;
-                const fusionLevel = s.fusion_level || 0;
-                const stats = s.current_stats || s;
-                const hp = stats.hp || stats.max_hp || 0;
-                const atk = stats.attack || stats.atk || 0;
+                // Try multiple possible field names
+                const name = s.species_name || s.speciesName || s.name || s.species?.name || 'Unknown';
+                const level = s.level || s.current_level || s.currentLevel || 1;
+                const fusionLevel = s.fusion_level || s.fusionLevel || 0;
+                
+                // Try to get stats from multiple possible locations
+                const stats = s.current_stats || s.currentStats || s.stats || s;
+                const hp = stats.hp || stats.max_hp || stats.maxHp || stats.health || 0;
+                const atk = stats.attack || stats.atk || stats.att || 0;
+                const def = stats.defense || stats.def || 0;
+                const spd = stats.speed || stats.spd || 0;
+                
+                console.log(`Stepling ${s.id}: name=${name}, level=${level}, hp=${hp}, atk=${atk}`);
                 
                 return `
                     <div onclick="assignToPosition(${position}, '${s.id}'); this.closest('[style*=fixed]').remove();" 
                          style="padding: 12px; background: rgba(255,255,255,0.15); border-radius: 8px; cursor: pointer;">
                         <div style="font-weight: bold;">${name}</div>
-                        <div style="font-size: 11px;">Lvl ${level}, F${fusionLevel} | HP: ${hp} | ATK: ${atk}</div>
+                        <div style="font-size: 11px;">Lvl ${level}, F${fusionLevel} | HP: ${hp} | ATK: ${atk} | DEF: ${def} | SPD: ${spd}</div>
                     </div>
                 `;
             }).join('')}
