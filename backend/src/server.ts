@@ -200,6 +200,65 @@ app.post('/debug/give-energy', async (req, res) => {
   }
 });
 
+// Google Sign-In endpoint for Gmail-based authentication
+app.post('/api/auth/google-signin', async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+    
+    // Check if player exists
+    let player = await database('players')
+      .where('email', email)
+      .first();
+    
+    if (!player) {
+      // Create new player with Gmail
+      const { v4: uuidv4 } = require('uuid');
+      const playerId = uuidv4();
+      
+      await database('players').insert({
+        id: playerId,
+        username: name || email.split('@')[0],
+        email: email,
+        password_hash: 'google_oauth', // Not used for OAuth
+        step_data: JSON.stringify({ total_steps: 0, daily_steps: 0, last_updated: new Date().toISOString() }),
+        resources: JSON.stringify({ cells: 0, experience_points: 0 }),
+        current_mode: 'discovery',
+        gems: 0,
+        energy_current: 10,
+        energy_max: 10,
+        energy_last_regen_time: database.fn.now(),
+        energy_last_step_count: 0
+      });
+      
+      player = await database('players').where('id', playerId).first();
+      console.log(`✅ Created new player: ${email} (${playerId})`);
+    } else {
+      console.log(`✅ Existing player logged in: ${email} (${player.id})`);
+    }
+    
+    res.json({
+      success: true,
+      player: {
+        id: player.id,
+        email: player.email,
+        username: player.username
+      }
+    });
+    
+  } catch (error) {
+    console.error('Google sign-in error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to authenticate',
+      message: error.message
+    });
+  }
+});
+
 // Debug endpoint to inspect database state
 app.get('/debug/database', async (req, res) => {
   try {
