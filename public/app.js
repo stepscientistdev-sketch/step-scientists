@@ -3230,8 +3230,16 @@ async function startBossBattle() {
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            alert(`Failed to start battle: ${error.message || error.error}`);
+            const errorText = await response.text();
+            let errorMsg = 'Unknown error';
+            try {
+                const error = JSON.parse(errorText);
+                errorMsg = error.message || error.error || errorText;
+            } catch {
+                errorMsg = errorText;
+            }
+            alert(`Failed to start battle: ${errorMsg}`);
+            console.error('Battle start error:', errorText);
             return;
         }
         
