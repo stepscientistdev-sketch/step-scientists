@@ -3,7 +3,17 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.hos
     ? 'http://192.168.1.111:3000'  // Local development
     : 'https://step-scientists-backend.onrender.com'; // Production Render URL
 
-const MOBILE_PLAYER_ID = '021cb11f-482a-44d2-b289-110400f23562'; // Hardcoded player ID for now
+// Player ID - loaded from localStorage after Gmail auth
+let PLAYER_ID = localStorage.getItem('playerId') || null;
+let PLAYER_EMAIL = localStorage.getItem('playerEmail') || null;
+
+// Legacy fallback (will be removed once all users migrate)
+const MOBILE_PLAYER_ID = '021cb11f-482a-44d2-b289-110400f23562';
+
+// Helper function to get current player ID
+function getPlayerId() {
+    return PLAYER_ID || MOBILE_PLAYER_ID;
+}
 
 var game = {
     steps: 5000, // Keep for backward compatibility - will become total lifetime steps
@@ -235,10 +245,41 @@ function getDailySteps() {
     return game.dailySteps;
 }
 
+// Check authentication status
+function checkAuthStatus() {
+    const playerId = localStorage.getItem('playerId');
+    const playerEmail = localStorage.getItem('playerEmail');
+    
+    if (playerId && playerEmail) {
+        // User is authenticated
+        PLAYER_ID = playerId;
+        PLAYER_EMAIL = playerEmail;
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('game-content').style.display = 'block';
+        log('✅ Authenticated as: ' + playerEmail);
+        return true;
+    } else {
+        // User needs to authenticate
+        document.getElementById('auth-overlay').style.display = 'flex';
+        document.getElementById('game-content').style.display = 'none';
+        log('⚠️ Please connect Google Fit to continue');
+        return false;
+    }
+}
+
 // Initialize
 async function init() {
     try {
         log('Initializing Step Scientists...');
+        
+        // Check authentication first
+        log('Step 0: Checking authentication...');
+        const isAuthenticated = checkAuthStatus();
+        
+        if (!isAuthenticated) {
+            log('⚠️ Not authenticated - waiting for Google Fit connection');
+            return; // Stop initialization until user connects
+        }
         
         log('Step 1: Testing connection...');
         await testConnection();
@@ -2279,7 +2320,7 @@ async function saveGameToBackend() {
     
     try {
         lastBackendSync = Date.now();
-        const response = await fetch(API_BASE + '/api/players/' + MOBILE_PLAYER_ID + '/gamestate', {
+        const response = await fetch(API_BASE + '/api/players/' + getPlayerId() + '/gamestate', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ gameState: game })
@@ -2297,7 +2338,7 @@ async function loadGameFromBackend() {
     if (!isConnected) return null;
     
     try {
-        const response = await fetch(API_BASE + '/api/players/' + MOBILE_PLAYER_ID + '/gamestate');
+        const response = await fetch(API_BASE + '/api/players/' + getPlayerId() + '/gamestate');
         
         if (response.ok) {
             const result = await response.json();
@@ -2580,14 +2621,14 @@ async function initializeGoogleFit() {
                 }
                 
                 const CLIENT_ID = '570511343860-48hgn66bnn5vjdsvb3m62m4qpinbfl9n.apps.googleusercontent.com';
-                const SCOPES = 'https://www.googleapis.com/auth/fitness.activity.read';
+                const SCOPES = 'https://www.googleapis.com/auth/fitness.activity.read email profile';
                 
                 return new Promise((resolve, reject) => {
                     const tokenClient = window.google.accounts.oauth2.initTokenClient({
                         client_id: CLIENT_ID,
                         scope: SCOPES,
                         prompt: silent ? '' : 'consent',
-                        callback: (tokenResponse) => {
+                        callback: async (tokenResponse) => {
                             if (tokenResponse.access_token) {
                                 this.accessToken = tokenResponse.access_token;
                                 
@@ -2602,7 +2643,57 @@ async function initializeGoogleFit() {
                                     log('✅ Refresh token saved - you won\'t need to reconnect often!');
                                 }
                                 
+                                // Extract user email and authenticate with backend
                                 if (!silent) {
+                                    try {
+                                        log('🔐 Authenticating with backend...');
+                                        
+                                        // Get user info from Google
+                                        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                                            headers: { 'Authorization': 'Bearer ' + tokenResponse.access_token }
+                                        });
+                                        
+                                        if (userInfoResponse.ok) {
+                                            const userInfo = await userInfoResponse.json();
+                                            const email = userInfo.email;
+                                            const name = userInfo.name;
+                                            
+                                            log('📧 Email: ' + email);
+                                            
+                                            // Authenticate with backend
+                                            const authResponse = await fetch(`${API_BASE}/api/auth/google-signin`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ email, name })
+                                            });
+                                            
+                                            if (authResponse.ok) {
+                                                const authData = await authResponse.json();
+                                                
+                                                // Store player ID and email
+                                                localStorage.setItem('playerId', authData.player.id);
+                                                localStorage.setItem('playerEmail', email);
+                                                PLAYER_ID = authData.player.id;
+                                                PLAYER_EMAIL = email;
+                                                
+                                                log('✅ Authenticated! Player ID: ' + authData.player.id.substring(0, 8) + '...');
+                                                
+                                                // Hide auth overlay and show game
+                                                document.getElementById('auth-overlay').style.display = 'none';
+                                                document.getElementById('game-content').style.display = 'block';
+                                            } else {
+                                                throw new Error('Backend authentication failed');
+                                            }
+                                        } else {
+                                            throw new Error('Failed to get user info from Google');
+                                        }
+                                    } catch (error) {
+                                        log('❌ Authentication error: ' + error.message);
+                                        alert('Failed to authenticate: ' + error.message);
+                                        reject(error);
+                                        return;
+                                    }
+                                    
                                     log('✅ Successfully connected to Google Fit!');
                                 }
                                 updateGoogleFitStatus(true);
@@ -2748,6 +2839,10 @@ async function connectGoogleFit() {
         
         log('🔗 Connecting to Google Fit...');
         await googleFitService.requestPermission();
+        
+        // After successful connection and auth, initialize the app
+        log('🎮 Starting game initialization...');
+        await init();
         
         // Load initial data after successful connection
         await loadGoogleFitData();
@@ -2961,7 +3056,7 @@ async function loadBattleData() {
     console.log('loadBattleData called');
     try {
         // Load energy
-        const energyResponse = await fetch(`${API_BASE}/api/player/energy?playerId=${MOBILE_PLAYER_ID}`);
+        const energyResponse = await fetch(`${API_BASE}/api/player/energy?playerId=${getPlayerId()}`);
         if (energyResponse.ok) {
             const energyData = await energyResponse.json();
             battleEnergy = energyData;
@@ -3240,13 +3335,13 @@ async function startBossBattle() {
         
         // Debug: Show what we're sending
         const debugInfo = team.map(s => `${s.species_name || s.name} (ID: ${s.id.substring(0, 8)}...)`).join(', ');
-        alert(`DEBUG: Sending ${teamIds.length} steplings:\n${debugInfo}\nPlayer: ${MOBILE_PLAYER_ID.substring(0, 8)}...`);
+        alert(`DEBUG: Sending ${teamIds.length} steplings:\n${debugInfo}\nPlayer: ${getPlayerId().substring(0, 8)}...`);
         
         const response = await fetch(`${API_BASE}/api/battle/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                playerId: MOBILE_PLAYER_ID,
+                playerId: getPlayerId(),
                 teamIds,
                 formation,
                 bossTier: selectedBossTier
@@ -3281,7 +3376,7 @@ async function startBossBattle() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                playerId: MOBILE_PLAYER_ID,
+                playerId: getPlayerId(),
                 battleState: startData.initialState
             })
         });
