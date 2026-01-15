@@ -64,11 +64,11 @@ export interface BattleResult {
 }
 
 const BOSS_TIERS = {
-  1: { hp: 10000, attack: 100, speed: 50, unlockTurn: 0 },
-  2: { hp: 30000, attack: 300, speed: 150, unlockTurn: 10 },
-  3: { hp: 90000, attack: 900, speed: 450, unlockTurn: 20 },
-  4: { hp: 270000, attack: 2700, speed: 1350, unlockTurn: 30 },
-  5: { hp: 810000, attack: 8100, speed: 4050, unlockTurn: 40 }
+  1: { hp: 50000, attack: 500, speed: 100, unlockTurn: 0 },
+  2: { hp: 150000, attack: 1500, speed: 200, unlockTurn: 10 },
+  3: { hp: 450000, attack: 4500, speed: 300, unlockTurn: 20 },
+  4: { hp: 1350000, attack: 13500, speed: 400, unlockTurn: 30 },
+  5: { hp: 4050000, attack: 40500, speed: 500, unlockTurn: 40 }
 };
 
 export class BattleService {
@@ -95,11 +95,12 @@ export class BattleService {
   
   /**
    * Scale boss stats for the current turn
+   * Boss gets stronger each turn but HP doesn't increase
    */
   private scaleBoss(boss: Boss): void {
-    boss.currentHP *= 1.10;      // +10% HP
-    boss.currentAttack *= 1.10;  // +10% Attack
-    boss.currentSpeed *= 1.05;   // +5% Speed
+    boss.currentAttack *= 1.10;  // +10% Attack per turn
+    boss.currentSpeed *= 1.05;   // +5% Speed per turn
+    // HP does NOT scale - boss should be killable!
   }
   
   /**
