@@ -2969,7 +2969,7 @@ async function loadBattleData() {
         }
         
         // Load steplings for team selection
-        await loadPlayerSteplings();
+        await loadSteplings();
         
         // Add visible debug info
         const tierContainer = document.getElementById('boss-tiers');
