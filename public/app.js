@@ -3216,28 +3216,14 @@ async function startBossBattle() {
                 bossTier: selectedBossTier
             })
         });
-            middle: [3, 4, 5],
-            back: [6, 7, 8, 9]
-        };
         
-        // Start battle
-        const startResponse = await fetch(`${API_BASE}/api/battle/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                teamIds: selectedBattleTeam,
-                formation,
-                bossTier: selectedBossTier
-            })
-        });
-        
-        if (!startResponse.ok) {
-            const error = await startResponse.json();
+        if (!response.ok) {
+            const error = await response.json();
             alert(`Failed to start battle: ${error.message || error.error}`);
             return;
         }
         
-        const startData = await startResponse.json();
+        const startData = await response.json();
         
         // Show battle in progress
         document.getElementById('battle-results').style.display = 'block';
