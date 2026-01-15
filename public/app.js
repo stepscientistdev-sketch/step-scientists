@@ -3066,16 +3066,28 @@ function displayBattleTeamSelection() {
     
     container.innerHTML = playerSteplings.map(s => {
         const isSelected = selectedBattleTeam.includes(s.id);
+        
+        // Handle different data structures
+        const name = s.species_name || s.name || 'Unknown';
+        const level = s.level || s.current_level || 1;
+        const fusionLevel = s.fusion_level || 0;
+        
+        // Get stats - handle both current_stats object and direct properties
+        const stats = s.current_stats || s;
+        const hp = stats.hp || stats.max_hp || 0;
+        const atk = stats.attack || stats.atk || 0;
+        const def = stats.defense || stats.def || 0;
+        const spd = stats.speed || stats.spd || 0;
+        
         return `
             <div onclick="toggleBattleTeamMember('${s.id}')" 
                  style="padding: 10px; margin: 5px 0; background: ${isSelected ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)'}; 
                         border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <strong>${s.species_name || 'Unknown'}</strong> (Lvl ${s.level}, F${s.fusion_level})
+                    <strong>${name}</strong> (Lvl ${level}, F${fusionLevel})
                     <br>
                     <span style="font-size: 11px;">
-                        HP: ${s.current_stats.hp} | ATK: ${s.current_stats.attack} | 
-                        DEF: ${s.current_stats.defense} | SPD: ${s.current_stats.speed}
+                        HP: ${hp} | ATK: ${atk} | DEF: ${def} | SPD: ${spd}
                     </span>
                 </div>
                 <div style="font-size: 20px;">${isSelected ? '✓' : ''}</div>
