@@ -2970,13 +2970,26 @@ async function loadBattleData() {
         
         // Load steplings for team selection
         await loadPlayerSteplings();
-        displayBattleTeamSelection();
         
-        // Display boss tiers
+        // Add visible debug info
+        const tierContainer = document.getElementById('boss-tiers');
+        const teamContainer = document.getElementById('battle-team-list');
+        
+        if (!tierContainer) {
+            alert('ERROR: boss-tiers container not found!');
+            return;
+        }
+        if (!teamContainer) {
+            alert('ERROR: battle-team-list container not found!');
+            return;
+        }
+        
+        displayBattleTeamSelection();
         displayBossTiers();
         
     } catch (error) {
         console.error('Error loading battle data:', error);
+        alert('Error loading battle: ' + error.message);
     }
 }
 
@@ -2996,10 +3009,11 @@ function updateBattleEnergyDisplay() {
 }
 
 function displayBossTiers() {
-    console.log('displayBossTiers called');
     const container = document.getElementById('boss-tiers');
-    console.log('boss-tiers container:', container);
-    if (!container) return;
+    if (!container) {
+        alert('boss-tiers container is null!');
+        return;
+    }
     
     const tiers = [
         { tier: 1, name: 'T1', hp: '10K', unlocked: true },
@@ -3028,7 +3042,10 @@ function displayBossTiers() {
             </div>
         `;
     }).join('');
-    console.log('Boss tiers rendered');
+    
+    if (container.innerHTML.length === 0) {
+        alert('Tiers HTML is empty!');
+    }
 }
 
 function selectBossTier(tier) {
