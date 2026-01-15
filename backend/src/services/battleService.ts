@@ -98,9 +98,9 @@ export class BattleService {
    * Boss gets stronger each turn but HP doesn't increase
    */
   private scaleBoss(boss: Boss): void {
-    boss.currentAttack *= 1.10;  // +10% Attack per turn
-    boss.currentSpeed *= 1.05;   // +5% Speed per turn
-    // HP does NOT scale - boss should be killable!
+    boss.currentAttack = boss.baseAttack * Math.pow(1.1, boss.turn);  // 1.1x per turn
+    boss.currentSpeed = boss.baseSpeed * Math.pow(1.05, boss.turn);   // 1.05x per turn
+    boss.turn++;
   }
   
   /**
@@ -162,11 +162,10 @@ export class BattleService {
   
   /**
    * Calculate boss damage to stepling
+   * Simple Attack/Defense ratio
    */
   private calculateBossDamage(boss: Boss, target: Stepling): number {
-    const baseDamage = boss.currentAttack;
-    const damageReduction = target.stats.defense / (target.stats.defense + 100);
-    return baseDamage * (1 - damageReduction);
+    return boss.currentAttack / target.stats.defense;
   }
   
   /**
@@ -286,8 +285,8 @@ export class BattleService {
         }
       }
       
-      // Safety limit: max 1000 turns
-      if (state.turn >= 1000) {
+      // Safety limit: max 100 turns (should never reach this with proper balancing)
+      if (state.turn >= 100) {
         state.status = 'defeat';
         break;
       }
