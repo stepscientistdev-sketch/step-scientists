@@ -3005,16 +3005,25 @@ function displayBossTiers() {
         { tier: 5, name: 'T5', hp: '810K', unlocked: false }
     ];
     
-    container.innerHTML = tiers.map(t => `
-        <div onclick="${t.unlocked ? `selectBossTier(${t.tier})` : ''}" 
-             style="padding: 10px; background: ${t.tier === selectedBossTier ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)'}; 
-                    border-radius: 8px; text-align: center; cursor: ${t.unlocked ? 'pointer' : 'not-allowed'}; 
-                    opacity: ${t.unlocked ? '1' : '0.5'};">
-            <div style="font-weight: bold;">${t.name}</div>
-            <div style="font-size: 10px;">${t.hp}</div>
-            ${!t.unlocked ? '<div style="font-size: 16px;">🔒</div>' : ''}
-        </div>
-    `).join('');
+    container.innerHTML = tiers.map(t => {
+        const isSelected = t.tier === selectedBossTier;
+        const bgColor = isSelected ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)';
+        const cursor = t.unlocked ? 'pointer' : 'not-allowed';
+        const opacity = t.unlocked ? '1' : '0.5';
+        const onclick = t.unlocked ? `selectBossTier(${t.tier})` : '';
+        const lockIcon = !t.unlocked ? '<div style="font-size: 16px;">🔒</div>' : '';
+        
+        return `
+            <div onclick="${onclick}" 
+                 style="padding: 10px; background: ${bgColor}; 
+                        border-radius: 8px; text-align: center; cursor: ${cursor}; 
+                        opacity: ${opacity};">
+                <div style="font-weight: bold;">${t.name}</div>
+                <div style="font-size: 10px;">${t.hp}</div>
+                ${lockIcon}
+            </div>
+        `;
+    }).join('');
 }
 
 function selectBossTier(tier) {
