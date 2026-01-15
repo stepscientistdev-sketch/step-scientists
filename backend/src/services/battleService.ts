@@ -315,14 +315,15 @@ export class BattleService {
     formation: BattleFormation,
     bossTier: number
   ): Promise<BattleState> {
-    // Validate team size
-    if (teamIds.length !== 10) {
-      throw new Error('Team must have exactly 10 steplings');
+    // Validate team size (1-10 steplings allowed)
+    if (teamIds.length < 1 || teamIds.length > 10) {
+      throw new Error('Team must have between 1 and 10 steplings');
     }
     
-    // Validate formation
-    if (formation.front.length !== 3 || formation.middle.length !== 3 || formation.back.length !== 4) {
-      throw new Error('Invalid formation: must be 3/3/4');
+    // Validate formation positions match team size
+    const totalPositions = formation.front.length + formation.middle.length + formation.back.length;
+    if (totalPositions !== teamIds.length) {
+      throw new Error(`Formation positions (${totalPositions}) must match team size (${teamIds.length})`);
     }
     
     // Fetch steplings from database
