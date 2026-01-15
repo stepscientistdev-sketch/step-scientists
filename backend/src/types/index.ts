@@ -13,10 +13,12 @@ export enum RarityTier {
 }
 
 export interface SteplingStats {
-  health: number;
+  hp: number;
   attack: number;
   defense: number;
-  special: number;
+  speed: number;
+  regen: number; // Percentage of HP regenerated, capped at 100%
+  lifesteal: number; // Percentage of attack damage stolen as HP, capped at 100%
 }
 
 export interface Ability {

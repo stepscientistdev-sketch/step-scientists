@@ -952,8 +952,11 @@ function updateFusionSteplingsGrid() {
     if (playerSteplings.length === 0) {
         html = '<div class="card">No steplings yet!</div>';
     } else {
-        for (var i = 0; i < playerSteplings.length; i++) {
-            var s = playerSteplings[i];
+        // Sort steplings before displaying
+        var sortedSteplings = sortSteplings(playerSteplings);
+        
+        for (var i = 0; i < sortedSteplings.length; i++) {
+            var s = sortedSteplings[i];
             var species = s.species || { name: 'Unknown', emoji: '❓' };
             var maxLevel = s.fusion_level * 10;
             var isMaxLevel = s.level >= maxLevel;
@@ -1673,6 +1676,55 @@ function updateAchievementDisplay() {
             detailsHtml += '</div>';
         }
         
+        // Show full achievement roadmap
+        detailsHtml += '<div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 10px;">';
+        detailsHtml += '<div style="font-weight: bold; margin-bottom: 8px;">🗺️ Achievement Roadmap</div>';
+        
+        for (let i = 0; i < LIFETIME_ACHIEVEMENTS.length; i++) {
+            const ach = LIFETIME_ACHIEVEMENTS[i];
+            const isUnlocked = totalSteps >= ach.steps;
+            const progress = Math.min((totalSteps / ach.steps) * 100, 100);
+            
+            detailsHtml += '<div style="background: rgba(255,255,255,' + (isUnlocked ? '0.15' : '0.05') + '); border-radius: 8px; padding: 10px; margin-bottom: 8px; border-left: 3px solid ' + (isUnlocked ? '#ffd700' : 'rgba(255,255,255,0.2)') + ';">';
+            detailsHtml += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">';
+            detailsHtml += '<div style="font-weight: bold; font-size: 13px;">' + (isUnlocked ? '✅ ' : '🔒 ') + ach.name + '</div>';
+            detailsHtml += '<div style="font-size: 11px; opacity: 0.8;">' + ach.steps.toLocaleString() + ' steps</div>';
+            detailsHtml += '</div>';
+            
+            // Progress bar
+            if (!isUnlocked) {
+                detailsHtml += '<div style="background: rgba(255,255,255,0.2); border-radius: 5px; height: 4px; overflow: hidden; margin-bottom: 5px;">';
+                detailsHtml += '<div style="background: #ffd700; height: 100%; width: ' + progress + '%;"></div>';
+                detailsHtml += '</div>';
+            }
+            
+            // Rewards
+            const rewards = [];
+            if (ach.rewards.bonusCellsPerDay) rewards.push('🎁 +' + ach.rewards.bonusCellsPerDay + ' cells/day');
+            if (ach.rewards.discoveryEfficiency) rewards.push('⚡ +' + ach.rewards.discoveryEfficiency + '% discovery');
+            if (ach.rewards.trainingEfficiency) rewards.push('💪 +' + ach.rewards.trainingEfficiency + '% training');
+            if (ach.rewards.clickPower) rewards.push('🖱️ x' + ach.rewards.clickPower + ' clicks');
+            if (ach.rewards.trainingRosterSlots) rewards.push('👥 ' + ach.rewards.trainingRosterSlots + ' slots');
+            if (ach.rewards.releaseXpBonus) rewards.push('💎 +' + ach.rewards.releaseXpBonus + '% release');
+            if (ach.rewards.experienceBankCap) {
+                const cap = ach.rewards.experienceBankCap === Infinity ? '∞' : ach.rewards.experienceBankCap;
+                rewards.push('🏦 ' + cap + ' XP bank');
+            }
+            
+            detailsHtml += '<div style="font-size: 10px; opacity: 0.7;">' + rewards.join(' • ') + '</div>';
+            detailsHtml += '</div>';
+        }
+        
+        // Infinite progression info
+        detailsHtml += '<div style="background: rgba(138,43,226,0.2); border-radius: 8px; padding: 10px; margin-top: 8px; border-left: 3px solid #8a2be2;">';
+        detailsHtml += '<div style="font-weight: bold; margin-bottom: 5px;">♾️ Infinite Progression (3.5M+ steps)</div>';
+        detailsHtml += '<div style="font-size: 11px; opacity: 0.9;">Every 600K steps after 3.5M:</div>';
+        detailsHtml += '<div style="font-size: 10px; opacity: 0.7; margin-top: 3px;">🎁 +1 cell/day • ⚡ +2% discovery • 💪 +2% training</div>';
+        detailsHtml += '<div style="font-size: 10px; opacity: 0.7; margin-top: 3px;">Caps: 50% efficiency, 10 cells/day (then cells continue infinitely)</div>';
+        detailsHtml += '</div>';
+        
+        detailsHtml += '</div>';
+        
         detailsHtml += '</div>';
         if (detailsEl) detailsEl.innerHTML = detailsHtml;
         if (detailsPopupEl) detailsPopupEl.innerHTML = detailsHtml;
@@ -1901,6 +1953,24 @@ function updateSpeciesGrid() {
     grid.innerHTML = html || '<div class="card">Loading species...</div>';
 }
 
+// Sort steplings by rarity, fusion level, then current level
+function sortSteplings(steplings) {
+    const rarityOrder = { 'common': 1, 'uncommon': 2, 'rare': 3, 'epic': 4, 'legendary': 5 };
+    
+    return steplings.slice().sort((a, b) => {
+        // First by rarity (highest first)
+        const rarityA = rarityOrder[a.species?.rarity || 'common'] || 1;
+        const rarityB = rarityOrder[b.species?.rarity || 'common'] || 1;
+        if (rarityB !== rarityA) return rarityB - rarityA;
+        
+        // Then by fusion level (highest first)
+        if (b.fusion_level !== a.fusion_level) return b.fusion_level - a.fusion_level;
+        
+        // Then by current level (highest first)
+        return b.level - a.level;
+    });
+}
+
 // Update steplings grid
 function updateSteplingsGrid() {
     console.log('=== updateSteplingsGrid DEBUG ===');
@@ -1917,8 +1987,12 @@ function updateSteplingsGrid() {
         console.log('No steplings found, showing empty message');
     } else {
         console.log('Building HTML for', playerSteplings.length, 'steplings');
-        for (var i = 0; i < playerSteplings.length; i++) {
-            var s = playerSteplings[i];
+        
+        // Sort steplings before displaying
+        var sortedSteplings = sortSteplings(playerSteplings);
+        
+        for (var i = 0; i < sortedSteplings.length; i++) {
+            var s = sortedSteplings[i];
             var species = s.species || { name: 'Unknown', emoji: '❓' };
             var maxLevel = s.fusion_level * 10;
             var isMaxLevel = s.level >= maxLevel;
@@ -1964,8 +2038,11 @@ function updateTrainingRosterGrid() {
     if (playerSteplings.length === 0) {
         html = '<div class="card">No steplings yet!</div>';
     } else {
-        for (var i = 0; i < playerSteplings.length; i++) {
-            var s = playerSteplings[i];
+        // Sort steplings before displaying
+        var sortedSteplings = sortSteplings(playerSteplings);
+        
+        for (var i = 0; i < sortedSteplings.length; i++) {
+            var s = sortedSteplings[i];
             var species = s.species || { name: 'Unknown', emoji: '❓' };
             var maxLevel = s.fusion_level * 10;
             var isMaxLevel = s.level >= maxLevel;
@@ -2035,11 +2112,13 @@ function showSteplingDetails(steplingId) {
     document.getElementById('stepling-name').innerHTML = species.name + (hasSuboptimalFusion ? ' ⚠️' : '');
     document.getElementById('stepling-level-info').innerHTML = 'Level ' + stepling.level + '/' + maxLevel + ' • Fusion ' + stepling.fusion_level;
     
-    // Stats
-    document.getElementById('stat-health').innerHTML = stepling.current_stats.health;
-    document.getElementById('stat-attack').innerHTML = stepling.current_stats.attack;
-    document.getElementById('stat-defense').innerHTML = stepling.current_stats.defense;
-    document.getElementById('stat-special').innerHTML = stepling.current_stats.special;
+    // Stats (support both old 'health' and new 'hp' format)
+    document.getElementById('stat-hp').innerHTML = stepling.current_stats.hp || stepling.current_stats.health || 0;
+    document.getElementById('stat-attack').innerHTML = stepling.current_stats.attack || 0;
+    document.getElementById('stat-defense').innerHTML = stepling.current_stats.defense || 0;
+    document.getElementById('stat-speed').innerHTML = stepling.current_stats.speed || 0;
+    document.getElementById('stat-regen').innerHTML = (stepling.current_stats.regen || 0).toFixed(1) + '%';
+    document.getElementById('stat-lifesteal').innerHTML = (stepling.current_stats.lifesteal || 0).toFixed(1) + '%';
     
     // Info
     document.getElementById('info-species').innerHTML = species.name;
@@ -2754,7 +2833,7 @@ async function loadGoogleFitData() {
                     game.experience += expToAdd;
                     const efficiencyText = efficiency > 0 ? ' (+' + efficiency + '% efficiency)' : '';
                     log('⭐ Earned ' + expToAdd + ' experience from sync!' + efficiencyText);
-                    distributeExperienceToRoster(expToAdd);
+                    await distributeExperienceToRoster(expToAdd);
                 }
             }
             

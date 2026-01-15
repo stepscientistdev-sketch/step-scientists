@@ -20,10 +20,12 @@ exports.seed = async function(knex) {
       description: 'A small, agile creature that loves to hop around meadows.',
       rarity_tier: 'common',
       base_stats: JSON.stringify({
-        health: 20,
-        attack: 15,
-        defense: 10,
-        special: 5
+        hp: 100,
+        attack: 50,
+        defense: 40,
+        speed: 30,
+        regen: 5,
+        lifesteal: 3
       }),
       abilities: JSON.stringify([
         {
@@ -47,10 +49,12 @@ exports.seed = async function(knex) {
       description: 'A sturdy turtle with a shell made of smooth pebbles.',
       rarity_tier: 'common',
       base_stats: JSON.stringify({
-        health: 30,
-        attack: 8,
-        defense: 20,
-        special: 2
+        hp: 150,
+        attack: 30,
+        defense: 80,
+        speed: 20,
+        regen: 8,
+        lifesteal: 2
       }),
       abilities: JSON.stringify([
         {
@@ -76,10 +80,12 @@ exports.seed = async function(knex) {
       description: 'A fiery salamander that can generate small flames.',
       rarity_tier: 'uncommon',
       base_stats: JSON.stringify({
-        health: 45,
-        attack: 35,
-        defense: 20,
-        special: 25
+        hp: 200,
+        attack: 120,
+        defense: 70,
+        speed: 90,
+        regen: 6,
+        lifesteal: 8
       }),
       abilities: JSON.stringify([
         {
@@ -109,10 +115,12 @@ exports.seed = async function(knex) {
       description: 'A beautiful beetle with crystalline wings that refract light.',
       rarity_tier: 'uncommon',
       base_stats: JSON.stringify({
-        health: 40,
-        attack: 25,
-        defense: 35,
-        special: 30
+        hp: 180,
+        attack: 90,
+        defense: 130,
+        speed: 60,
+        regen: 7,
+        lifesteal: 5
       }),
       abilities: JSON.stringify([
         {
@@ -144,10 +152,12 @@ exports.seed = async function(knex) {
       description: 'A majestic eagle that commands the power of storms.',
       rarity_tier: 'rare',
       base_stats: JSON.stringify({
-        health: 80,
-        attack: 70,
-        defense: 45,
-        special: 85
+        hp: 300,
+        attack: 200,
+        defense: 150,
+        speed: 250,
+        regen: 10,
+        lifesteal: 12
       }),
       abilities: JSON.stringify([
         {

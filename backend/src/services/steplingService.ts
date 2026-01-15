@@ -234,12 +234,14 @@ class SteplingServiceImpl {
           remainingExp -= expRequired;
           currentLevel++;
           
-          // Increase stats by 10% of base stats
+          // Increase stats by 10% of base stats (2% for regen/lifesteal)
           const statIncrease = this.calculateStatIncrease(species.base_stats);
-          newStats.health += statIncrease.health;
+          newStats.hp += statIncrease.hp;
           newStats.attack += statIncrease.attack;
           newStats.defense += statIncrease.defense;
-          newStats.special += statIncrease.special;
+          newStats.speed += statIncrease.speed;
+          newStats.regen = Math.min(100, newStats.regen + statIncrease.regen); // Cap at 100%
+          newStats.lifesteal = Math.min(100, newStats.lifesteal + statIncrease.lifesteal); // Cap at 100%
         } else {
           break;
         }
@@ -294,12 +296,14 @@ class SteplingServiceImpl {
   }
 
   private calculateStatIncrease(baseStats: SteplingStats): SteplingStats {
-    // 10% of base stats, rounded to nearest integer
+    // 10% of base stats for main stats, 2% for regen/lifesteal (to avoid hitting 100% cap too fast)
     return {
-      health: Math.round(baseStats.health * 0.1),
+      hp: Math.round(baseStats.hp * 0.1),
       attack: Math.round(baseStats.attack * 0.1),
       defense: Math.round(baseStats.defense * 0.1),
-      special: Math.round(baseStats.special * 0.1),
+      speed: Math.round(baseStats.speed * 0.1),
+      regen: Math.min(100, Math.round(baseStats.regen * 0.02 * 100) / 100), // 2% growth, capped at 100%
+      lifesteal: Math.min(100, Math.round(baseStats.lifesteal * 0.02 * 100) / 100), // 2% growth, capped at 100%
     };
   }
 
