@@ -64,11 +64,11 @@ export interface BattleResult {
 }
 
 const BOSS_TIERS = {
-  1: { hp: 50000, attack: 500, speed: 100, unlockTurn: 0 },
-  2: { hp: 150000, attack: 1500, speed: 200, unlockTurn: 10 },
-  3: { hp: 450000, attack: 4500, speed: 300, unlockTurn: 20 },
-  4: { hp: 1350000, attack: 13500, speed: 400, unlockTurn: 30 },
-  5: { hp: 4050000, attack: 40500, speed: 500, unlockTurn: 40 }
+  1: { hp: 5000, attack: 100, speed: 50, unlockTurn: 0 },
+  2: { hp: 15000, attack: 200, speed: 75, unlockTurn: 10 },
+  3: { hp: 45000, attack: 400, speed: 100, unlockTurn: 20 },
+  4: { hp: 135000, attack: 800, speed: 125, unlockTurn: 30 },
+  5: { hp: 405000, attack: 1600, speed: 150, unlockTurn: 40 }
 };
 
 export class BattleService {
