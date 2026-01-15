@@ -2943,3 +2943,241 @@ function forceCacheRefresh() {
         window.location.reload(true);
     }
 }
+
+
+// ===== BATTLE SYSTEM =====
+
+let battleEnergy = { current: 10, max: 10 };
+let selectedBattleTeam = [];
+let selectedBossTier = 1;
+
+async function viewBattle() {
+    showSection('battle-section');
+    await loadBattleData();
+}
+
+async function loadBattleData() {
+    try {
+        // Load energy
+        const energyResponse = await fetch(`${API_BASE}/api/player/energy?playerId=${MOBILE_PLAYER_ID}`);
+        if (energyResponse.ok) {
+            const energyData = await energyResponse.json();
+            battleEnergy = energyData;
+            updateBattleEnergyDisplay();
+        }
+        
+        // Load steplings for team selection
+        await loadPlayerSteplings();
+        displayBattleTeamSelection();
+        
+        // Display boss tiers
+        displayBossTiers();
+        
+    } catch (error) {
+        console.error('Error loading battle data:', error);
+    }
+}
+
+function updateBattleEnergyDisplay() {
+    const energyEl = document.getElementById('battle-energy');
+    const infoEl = document.getElementById('battle-energy-info');
+    
+    if (energyEl) {
+        energyEl.textContent = `⚡ ${battleEnergy.current}/${battleEnergy.max}`;
+        energyEl.style.color = battleEnergy.current === 0 ? '#f44336' : '#4CAF50';
+    }
+    
+    if (infoEl && battleEnergy.timeUntilNextRegen) {
+        const minutes = Math.ceil(battleEnergy.timeUntilNextRegen / 1000 / 60);
+        infoEl.textContent = `Next regen in: ${minutes}m | Walk 1,000 steps for +1 energy`;
+    }
+}
+
+function displayBossTiers() {
+    const container = document.getElementById('boss-tiers');
+    if (!container) return;
+    
+    const tiers = [
+        { tier: 1, name: 'T1', hp: '10K', unlocked: true },
+        { tier: 2, name: 'T2', hp: '30K', unlocked: false },
+        { tier: 3, name: 'T3', hp: '90K', unlocked: false },
+        { tier: 4, name: 'T4', hp: '270K', unlocked: false },
+        { tier: 5, name: 'T5', hp: '810K', unlocked: false }
+    ];
+    
+    container.innerHTML = tiers.map(t => `
+        <div onclick="${t.unlocked ? `selectBossTier(${t.tier})` : ''}" 
+             style="padding: 10px; background: ${t.tier === selectedBossTier ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)'}; 
+                    border-radius: 8px; text-align: center; cursor: ${t.unlocked ? 'pointer' : 'not-allowed'}; 
+                    opacity: ${t.unlocked ? '1' : '0.5'};">
+            <div style="font-weight: bold;">${t.name}</div>
+            <div style="font-size: 10px;">${t.hp}</div>
+            ${!t.unlocked ? '<div style="font-size: 16px;">🔒</div>' : ''}
+        </div>
+    `).join('');
+}
+
+function selectBossTier(tier) {
+    selectedBossTier = tier;
+    displayBossTiers();
+}
+
+function displayBattleTeamSelection() {
+    const container = document.getElementById('battle-team-list');
+    if (!container || !playerSteplings || playerSteplings.length === 0) {
+        if (container) container.innerHTML = '<p style="text-align: center; opacity: 0.6;">No steplings available. Catch some first!</p>';
+        return;
+    }
+    
+    container.innerHTML = playerSteplings.map(s => {
+        const isSelected = selectedBattleTeam.includes(s.id);
+        return `
+            <div onclick="toggleBattleTeamMember('${s.id}')" 
+                 style="padding: 10px; margin: 5px 0; background: ${isSelected ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)'}; 
+                        border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${s.species_name || 'Unknown'}</strong> (Lvl ${s.level}, F${s.fusion_level})
+                    <br>
+                    <span style="font-size: 11px;">
+                        HP: ${s.current_stats.hp} | ATK: ${s.current_stats.attack} | 
+                        DEF: ${s.current_stats.defense} | SPD: ${s.current_stats.speed}
+                    </span>
+                </div>
+                <div style="font-size: 20px;">${isSelected ? '✓' : ''}</div>
+            </div>
+        `;
+    }).join('');
+    
+    updateBattleTeamCount();
+}
+
+function toggleBattleTeamMember(steplingId) {
+    const index = selectedBattleTeam.indexOf(steplingId);
+    
+    if (index > -1) {
+        selectedBattleTeam.splice(index, 1);
+    } else {
+        if (selectedBattleTeam.length >= 10) {
+            alert('Maximum 10 steplings allowed!');
+            return;
+        }
+        selectedBattleTeam.push(steplingId);
+    }
+    
+    displayBattleTeamSelection();
+}
+
+function updateBattleTeamCount() {
+    const countEl = document.getElementById('battle-team-count');
+    const startBtn = document.getElementById('start-battle-btn');
+    
+    if (countEl) {
+        countEl.textContent = selectedBattleTeam.length;
+    }
+    
+    if (startBtn) {
+        startBtn.disabled = selectedBattleTeam.length !== 10 || battleEnergy.current === 0;
+        startBtn.textContent = battleEnergy.current === 0 ? 'Not Enough Energy' : 
+                               selectedBattleTeam.length !== 10 ? `Select ${10 - selectedBattleTeam.length} More` : 
+                               'Start Battle';
+    }
+}
+
+async function startBossBattle() {
+    if (selectedBattleTeam.length !== 10) {
+        alert('Select exactly 10 steplings!');
+        return;
+    }
+    
+    if (battleEnergy.current === 0) {
+        alert('Not enough energy! Walk or wait for regeneration.');
+        return;
+    }
+    
+    try {
+        // Auto-arrange formation (first 3 front, next 3 middle, last 4 back)
+        const formation = {
+            front: [0, 1, 2],
+            middle: [3, 4, 5],
+            back: [6, 7, 8, 9]
+        };
+        
+        // Start battle
+        const startResponse = await fetch(`${API_BASE}/api/battle/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                teamIds: selectedBattleTeam,
+                formation,
+                bossTier: selectedBossTier
+            })
+        });
+        
+        if (!startResponse.ok) {
+            const error = await startResponse.json();
+            alert(`Failed to start battle: ${error.message || error.error}`);
+            return;
+        }
+        
+        const startData = await startResponse.json();
+        
+        // Show battle in progress
+        document.getElementById('battle-results').style.display = 'block';
+        document.getElementById('battle-results').innerHTML = '<p style="text-align: center;">⚔️ Battle in progress...</p>';
+        
+        // Simulate battle
+        const simResponse = await fetch(`${API_BASE}/api/battle/simulate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                battleState: startData.initialState
+            })
+        });
+        
+        if (simResponse.ok) {
+            const simData = await simResponse.json();
+            displayBattleResults(simData.result);
+            
+            // Reload energy
+            await loadBattleData();
+        }
+        
+    } catch (error) {
+        console.error('Battle error:', error);
+        alert('Battle failed: ' + error.message);
+    }
+}
+
+function displayBattleResults(result) {
+    const container = document.getElementById('battle-results');
+    if (!container) return;
+    
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div style="text-align: center; font-size: 24px; font-weight: bold; color: ${result.victory ? '#4CAF50' : '#f44336'}; margin-bottom: 15px;">
+            ${result.victory ? '🎉 VICTORY!' : '💀 DEFEAT'}
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold;">${result.turnsSurvived}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Turns Survived</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold;">${result.totalDamage.toLocaleString()}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Total Damage</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold;">${result.score.toLocaleString()}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Score</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold;">💎 ${result.gemsEarned}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Gems Earned</div>
+            </div>
+        </div>
+        ${result.newTierUnlocked ? `<div style="background: rgba(76, 175, 80, 0.3); padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 10px;">
+            🎊 New Tier Unlocked: Tier ${result.newTierUnlocked}!
+        </div>` : ''}
+        <button class="btn" onclick="viewBattle()" style="width: 100%;">Battle Again</button>
+    `;
+}

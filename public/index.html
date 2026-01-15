@@ -292,6 +292,7 @@
             <button class="btn" onclick="viewSteplings()">View Steplings</button>
             <button class="btn btn-warning" onclick="manageTrainingRoster()" id="training-btn">Training Roster</button>
             <button class="btn btn-secondary" onclick="manageFusion()" id="fusion-btn">Fusion Lab</button>
+            <button class="btn" onclick="viewBattle()" id="battle-btn" style="background: rgba(244, 67, 54, 0.8);">⚔️ Battle</button>
             <button class="btn" onclick="viewProgress()">📊 Progress</button>
             <button class="btn" onclick="syncSteps()">Sync Steps</button>
         </div>
@@ -501,3 +502,46 @@
     <script src="app.js"></script>
 </body>
 </html>
+
+        <!-- Battle Section -->
+        <div id="battle-section" class="section">
+            <div class="section-content">
+                <div class="section-header">
+                    <h3>⚔️ Boss Battle</h3>
+                    <button class="close-btn" onclick="closeAllSections()">×</button>
+                </div>
+                
+                <!-- Energy Display -->
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold;" id="battle-energy">⚡ 10/10</div>
+                    <div style="font-size: 12px; opacity: 0.8;" id="battle-energy-info">Next regen in: --</div>
+                </div>
+                
+                <!-- Boss Tier Selection -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 10px 0;">Select Boss Tier:</h4>
+                    <div id="boss-tiers" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+                        <!-- Tiers will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Team Selection -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 10px 0;">Select Team (10 Steplings):</h4>
+                    <div style="font-size: 12px; margin-bottom: 10px;">Selected: <span id="battle-team-count">0</span>/10</div>
+                    <div id="battle-team-list" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Steplings will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Start Battle Button -->
+                <button class="btn" onclick="startBossBattle()" id="start-battle-btn" style="width: 100%; background: rgba(244, 67, 54, 0.8); font-size: 18px; padding: 15px;" disabled>
+                    Start Battle
+                </button>
+                
+                <!-- Battle Results -->
+                <div id="battle-results" style="display: none; margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                    <!-- Results will be shown here -->
+                </div>
+            </div>
+        </div>
