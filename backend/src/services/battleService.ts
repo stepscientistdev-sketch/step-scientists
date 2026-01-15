@@ -162,10 +162,12 @@ export class BattleService {
   
   /**
    * Calculate boss damage to stepling
-   * Simple Attack/Defense ratio
+   * Attack/Defense ratio with minimum damage floor
    */
   private calculateBossDamage(boss: Boss, target: Stepling): number {
-    return boss.currentAttack / target.stats.defense;
+    const ratio = boss.currentAttack / Math.max(target.stats.defense, 1);
+    // Ensure boss does meaningful damage even early on
+    return Math.max(ratio, boss.currentAttack * 0.5);
   }
   
   /**
