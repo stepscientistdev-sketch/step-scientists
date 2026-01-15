@@ -2994,7 +2994,9 @@ function updateBattleEnergyDisplay() {
 }
 
 function displayBossTiers() {
+    console.log('displayBossTiers called');
     const container = document.getElementById('boss-tiers');
+    console.log('boss-tiers container:', container);
     if (!container) return;
     
     const tiers = [
@@ -3024,15 +3026,20 @@ function displayBossTiers() {
             </div>
         `;
     }).join('');
+    console.log('Boss tiers rendered');
 }
 
 function selectBossTier(tier) {
+    console.log('selectBossTier called with tier:', tier);
     selectedBossTier = tier;
     displayBossTiers();
 }
 
 function displayBattleTeamSelection() {
+    console.log('displayBattleTeamSelection called');
     const container = document.getElementById('battle-team-list');
+    console.log('battle-team-list container:', container);
+    console.log('playerSteplings:', playerSteplings);
     if (!container || !playerSteplings || playerSteplings.length === 0) {
         if (container) container.innerHTML = '<p style="text-align: center; opacity: 0.6;">No steplings available. Catch some first!</p>';
         return;
@@ -3058,9 +3065,11 @@ function displayBattleTeamSelection() {
     }).join('');
     
     updateBattleTeamCount();
+    console.log('Battle team rendered');
 }
 
 function toggleBattleTeamMember(steplingId) {
+    console.log('toggleBattleTeamMember called with:', steplingId);
     const index = selectedBattleTeam.indexOf(steplingId);
     
     if (index > -1) {
