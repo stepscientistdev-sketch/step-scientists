@@ -99,11 +99,24 @@ A mobile MMO monster collection game where players use real-world step counts to
 
 #### Acceptance Criteria
 
-1. THE Battle_System SHALL provide boss encounters with varying difficulty levels and monster requirements
-2. THE Battle_System SHALL position monsters with highest defense statistics in front row positions automatically
-3. WHEN a Player initiates a boss battle, THE Battle_System SHALL use the Player's selected team against the boss monster
-4. THE Battle_System SHALL calculate battle outcomes based on team composition, individual monster stats, and strategic positioning
-5. THE Battle_System SHALL award rewards based on boss difficulty and battle performance
+1. THE Battle_System SHALL allow players to form teams of exactly 10 steplings arranged in 3 rows (front: 3, middle: 3, back: 4)
+2. THE Battle_System SHALL provide 5 boss tiers with unlock conditions based on turn survival (Tier 2 at turn 10, Tier 3 at turn 20, Tier 4 at turn 30, Tier 5 at turn 40)
+3. WHEN a boss battle begins, THE Battle_System SHALL initialize boss stats based on tier (Tier 1: 10,000 HP, 100 ATK, 50 SPD)
+4. THE Battle_System SHALL scale boss stats each turn by +10% HP, +10% ATK, +5% SPD
+5. THE Battle_System SHALL calculate turn order each round by sorting all combatants (10 steplings + boss) by Speed stat in descending order
+6. WHEN a stepling's turn occurs, THE Battle_System SHALL apply regen healing (maxHP × regen%), then deal damage equal to stepling's Attack stat to boss, then apply lifesteal healing (damage × lifesteal%)
+7. WHEN the boss's turn occurs, THE Battle_System SHALL target a random alive stepling from the frontmost active row (front → middle → back priority)
+8. THE Battle_System SHALL calculate boss damage using formula: finalDamage = bossAttack × (1 - (steplingDefense / (steplingDefense + 100)))
+9. THE Battle_System SHALL continue battle until boss HP reaches 0 (victory) or all steplings are defeated (defeat)
+10. THE Battle_System SHALL calculate score as total damage dealt to boss (1 damage = 1 point)
+11. THE Battle_System SHALL maintain global, daily, and weekly leaderboards per boss tier showing highest damage scores
+12. THE Battle_System SHALL award gems based on points earned (100 points = 1 gem) for use in future store system
+13. THE Battle_System SHALL require 1 energy point to initiate a boss battle, and SHALL prevent battle initiation when player energy is 0
+14. THE Mobile_App SHALL track player energy with a maximum capacity of 10 energy points
+15. THE Mobile_App SHALL regenerate 1 energy point every 30 minutes automatically (passive regeneration)
+16. THE Mobile_App SHALL award 1 energy point for every 1,000 steps walked (active regeneration)
+17. THE Mobile_App SHALL cap energy at maximum capacity and SHALL not accumulate energy beyond the cap
+18. THE Mobile_App SHALL display current energy, maximum energy, and time until next passive energy regeneration
 
 ### Requirement 7
 

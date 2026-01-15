@@ -579,77 +579,618 @@ const VALIDATION_RULES = {
 5. **User Notification**: Email/in-app notification of decision
 6. **Database Integration**: Approved species added to discovery pool with `isDiscovered: false`
 
+### Energy System
+
+#### Energy Mechanics
+```typescript
+interface PlayerEnergy {
+  current: number; // 0-10
+  max: number; // Default 10
+  lastRegenTime: Date;
+  lastStepCount: number; // For tracking step-based energy
+}
+
+const ENERGY_CONFIG = {
+  maxCapacity: 10,
+  battleCost: 1,
+  passiveRegenInterval: 30 * 60 * 1000, // 30 minutes in ms
+  passiveRegenAmount: 1,
+  stepsPerEnergy: 1000,
+  activeRegenAmount: 1
+};
+
+class EnergyService {
+  // Calculate passive energy regeneration
+  calculatePassiveRegen(player: Player): number {
+    const now = new Date();
+    const timeSinceLastRegen = now.getTime() - player.energy.lastRegenTime.getTime();
+    const intervalsElapsed = Math.floor(timeSinceLastRegen / ENERGY_CONFIG.passiveRegenInterval);
+    
+    if (intervalsElapsed > 0) {
+      const regenAmount = intervalsElapsed * ENERGY_CONFIG.passiveRegenAmount;
+      const newEnergy = Math.min(
+        player.energy.current + regenAmount,
+        player.energy.max
+      );
+      
+      // Update last regen time to the last complete interval
+      const newLastRegenTime = new Date(
+        player.energy.lastRegenTime.getTime() + 
+        (intervalsElapsed * ENERGY_CONFIG.passiveRegenInterval)
+      );
+      
+      return { newEnergy, newLastRegenTime, regenAmount };
+    }
+    
+    return { newEnergy: player.energy.current, newLastRegenTime: player.energy.lastRegenTime, regenAmount: 0 };
+  }
+  
+  // Calculate active energy from steps
+  calculateActiveRegen(player: Player, currentSteps: number): number {
+    const stepsSinceLastCheck = currentSteps - player.energy.lastStepCount;
+    const energyEarned = Math.floor(stepsSinceLastCheck / ENERGY_CONFIG.stepsPerEnergy);
+    
+    if (energyEarned > 0) {
+      const newEnergy = Math.min(
+        player.energy.current + energyEarned,
+        player.energy.max
+      );
+      const stepsConsumed = energyEarned * ENERGY_CONFIG.stepsPerEnergy;
+      const newLastStepCount = player.energy.lastStepCount + stepsConsumed;
+      
+      return { newEnergy, newLastStepCount, energyEarned };
+    }
+    
+    return { newEnergy: player.energy.current, newLastStepCount: player.energy.lastStepCount, energyEarned: 0 };
+  }
+  
+  // Update energy (called on app sync)
+  async updateEnergy(playerId: string, currentSteps: number): Promise<PlayerEnergy> {
+    const player = await this.getPlayer(playerId);
+    
+    // Apply passive regen
+    const passiveResult = this.calculatePassiveRegen(player);
+    player.energy.current = passiveResult.newEnergy;
+    player.energy.lastRegenTime = passiveResult.newLastRegenTime;
+    
+    // Apply active regen from steps
+    const activeResult = this.calculateActiveRegen(player, currentSteps);
+    player.energy.current = activeResult.newEnergy;
+    player.energy.lastStepCount = activeResult.newLastStepCount;
+    
+    await this.savePlayer(player);
+    return player.energy;
+  }
+  
+  // Check if player can start battle
+  canStartBattle(player: Player): boolean {
+    return player.energy.current >= ENERGY_CONFIG.battleCost;
+  }
+  
+  // Consume energy for battle
+  async consumeEnergy(playerId: string, amount: number): Promise<boolean> {
+    const player = await this.getPlayer(playerId);
+    
+    if (player.energy.current >= amount) {
+      player.energy.current -= amount;
+      await this.savePlayer(player);
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Get time until next passive regen
+  getTimeUntilNextRegen(player: Player): number {
+    const now = new Date();
+    const timeSinceLastRegen = now.getTime() - player.energy.lastRegenTime.getTime();
+    const timeUntilNext = ENERGY_CONFIG.passiveRegenInterval - (timeSinceLastRegen % ENERGY_CONFIG.passiveRegenInterval);
+    return timeUntilNext;
+  }
+}
+```
+
+#### Energy Display Component
+```typescript
+interface EnergyDisplayProps {
+  current: number;
+  max: number;
+  timeUntilNextRegen: number; // milliseconds
+}
+
+// UI shows:
+// ⚡ 7/10 Energy
+// Next: 15m 30s
+// +1 energy per 1,000 steps
+```
+
 ### Battle System Mechanics
 
-#### Team Positioning Algorithm
+#### Team Formation Algorithm
 ```typescript
-interface BattlePositioning {
-  calculateFormation(team: Stepling[]): BattleFormation;
-  getPositionBonus(position: BattlePosition): StatBonus;
-}
-
 interface BattleFormation {
-  frontRow: Stepling[]; // Highest defense stats
-  middleRow: Stepling[]; // Balanced stats
-  backRow: Stepling[]; // Highest attack/special stats
+  front: Stepling[]; // 3 steplings (positions 0-2)
+  middle: Stepling[]; // 3 steplings (positions 3-5)
+  back: Stepling[]; // 4 steplings (positions 6-9)
 }
 
-class PositioningAlgorithm {
-  calculateFormation(team: Stepling[]): BattleFormation {
-    // Sort by composite defensive score
-    const sortedByDefense = team.sort((a, b) => {
-      const aDefense = a.stats.defense + (a.stats.health * 0.5);
-      const bDefense = b.stats.defense + (b.stats.health * 0.5);
-      return bDefense - aDefense;
-    });
+interface BattleTeam {
+  steplings: Stepling[]; // Exactly 10 steplings
+  formation: BattleFormation;
+}
+
+// Player manually arranges steplings in formation
+// No automatic positioning - strategic choice matters
+```
+
+#### Boss System
+```typescript
+interface Boss {
+  tier: number; // 1-5
+  baseHP: number;
+  baseAttack: number;
+  baseSpeed: number;
+  currentHP: number;
+  currentAttack: number;
+  currentSpeed: number;
+  turn: number;
+}
+
+// Boss tier configuration
+const BOSS_TIERS = {
+  1: { hp: 10000, attack: 100, speed: 50, unlockTurn: 0 },
+  2: { hp: 30000, attack: 300, speed: 150, unlockTurn: 10 },
+  3: { hp: 90000, attack: 900, speed: 450, unlockTurn: 20 },
+  4: { hp: 270000, attack: 2700, speed: 1350, unlockTurn: 30 },
+  5: { hp: 810000, attack: 8100, speed: 4050, unlockTurn: 40 }
+};
+
+// Boss scaling per turn
+function scaleBoss(boss: Boss): void {
+  boss.currentHP *= 1.10;      // +10% HP
+  boss.currentAttack *= 1.10;  // +10% Attack
+  boss.currentSpeed *= 1.05;   // +5% Speed
+}
+```
+
+#### Turn Order System
+```typescript
+interface Combatant {
+  id: string;
+  name: string;
+  type: 'stepling' | 'boss';
+  speed: number;
+  hp: number;
+  maxHP: number;
+  stats: SteplingStats | BossStats;
+}
+
+class TurnOrderCalculator {
+  calculateTurnOrder(steplings: Stepling[], boss: Boss): Combatant[] {
+    const combatants: Combatant[] = [
+      ...steplings.map(s => this.toCombatant(s, 'stepling')),
+      this.toCombatant(boss, 'boss')
+    ];
     
-    return {
-      frontRow: sortedByDefense.slice(0, 2), // Top 2 defenders
-      middleRow: sortedByDefense.slice(2, 4), // Middle 2
-      backRow: sortedByDefense.slice(4, 6)    // Remaining attackers
-    };
+    // Sort by speed descending (highest speed acts first)
+    return combatants
+      .filter(c => c.hp > 0)
+      .sort((a, b) => b.speed - a.speed);
+  }
+}
+```
+
+#### Combat Actions
+```typescript
+interface SteplingTurn {
+  // 1. Regen at start of turn
+  applyRegen(stepling: Stepling): number {
+    const healAmount = stepling.maxHP * (stepling.stats.regen / 100);
+    stepling.currentHP = Math.min(stepling.currentHP + healAmount, stepling.maxHP);
+    return healAmount;
+  }
+  
+  // 2. Attack boss
+  attackBoss(stepling: Stepling, boss: Boss): number {
+    const damage = stepling.stats.attack;
+    boss.currentHP -= damage;
+    return damage;
+  }
+  
+  // 3. Lifesteal healing
+  applyLifesteal(stepling: Stepling, damageDealt: number): number {
+    const healAmount = damageDealt * (stepling.stats.lifesteal / 100);
+    stepling.currentHP = Math.min(stepling.currentHP + healAmount, stepling.maxHP);
+    return healAmount;
   }
 }
 
-// Position bonuses
-const POSITION_BONUSES = {
-  frontRow: { defense: 1.2, health: 1.15 }, // 20% defense, 15% health
-  middleRow: { attack: 1.1, defense: 1.05 }, // 10% attack, 5% defense
-  backRow: { attack: 1.25, special: 1.2 }    // 25% attack, 20% special
-};
+interface BossTurn {
+  // Find active row (front → middle → back)
+  getActiveRow(formation: BattleFormation): Stepling[] {
+    const frontAlive = formation.front.filter(s => s.currentHP > 0);
+    if (frontAlive.length > 0) return frontAlive;
+    
+    const middleAlive = formation.middle.filter(s => s.currentHP > 0);
+    if (middleAlive.length > 0) return middleAlive;
+    
+    return formation.back.filter(s => s.currentHP > 0);
+  }
+  
+  // Select random target from active row
+  selectTarget(activeRow: Stepling[]): Stepling {
+    return activeRow[Math.floor(Math.random() * activeRow.length)];
+  }
+  
+  // Calculate damage with defense formula
+  calculateDamage(boss: Boss, target: Stepling): number {
+    const baseDamage = boss.currentAttack;
+    const damageReduction = target.stats.defense / (target.stats.defense + 100);
+    return baseDamage * (1 - damageReduction);
+  }
+}
 ```
 
-#### Boss Encounter System
+#### Battle Loop
 ```typescript
-interface BossEncounter {
-  id: string;
-  name: string;
-  difficulty: number; // 1-10 scale
-  requiredPower: number; // Minimum team power recommendation
-  mechanics: BossMechanic[]; // Special abilities/phases
-  rewards: BattleReward[];
-  unlockRequirements: UnlockRequirement[];
+interface BattleState {
+  boss: Boss;
+  team: BattleTeam;
+  turn: number;
+  totalDamage: number;
+  battleLog: BattleEvent[];
+  status: 'ongoing' | 'victory' | 'defeat';
 }
 
-interface BossMechanic {
-  name: string;
-  description: string;
-  triggerCondition: string; // "health < 50%", "turn 5", etc.
-  effect: MechanicEffect;
+interface BattleEvent {
+  turn: number;
+  actor: string;
+  action: 'attack' | 'heal' | 'death' | 'regen' | 'lifesteal';
+  target: string;
+  value: number;
+  timestamp: Date;
 }
 
-// Boss scaling formula
-function calculateBossStats(baseBoss: BossTemplate, playerLevel: number): BossStats {
-  const scalingFactor = 1 + (playerLevel * 0.1); // 10% per player level
-  return {
-    health: baseBoss.baseHealth * scalingFactor,
-    attack: baseBoss.baseAttack * scalingFactor,
-    defense: baseBoss.baseDefense * scalingFactor,
-    special: baseBoss.baseSpecial * scalingFactor
-  };
+class BattleSimulator {
+  async simulateBattle(team: BattleTeam, bossTier: number): Promise<BattleResult> {
+    const state: BattleState = this.initializeBattle(team, bossTier);
+    
+    while (state.status === 'ongoing') {
+      state.turn++;
+      
+      // Scale boss at start of turn
+      scaleBoss(state.boss);
+      
+      // Calculate turn order
+      const turnOrder = this.calculateTurnOrder(state.team.steplings, state.boss);
+      
+      // Execute each combatant's turn
+      for (const combatant of turnOrder) {
+        if (combatant.type === 'stepling') {
+          this.executeSteplingTurn(combatant, state);
+        } else {
+          this.executeBossTurn(state.boss, state.team, state);
+        }
+        
+        // Check win/loss conditions
+        if (state.boss.currentHP <= 0) {
+          state.status = 'victory';
+          break;
+        }
+        if (this.allSteplingsDead(state.team)) {
+          state.status = 'defeat';
+          break;
+        }
+      }
+    }
+    
+    return this.generateBattleResult(state);
+  }
+  
+  private executeSteplingTurn(stepling: Stepling, state: BattleState): void {
+    // 1. Regen
+    const regenAmount = this.applyRegen(stepling);
+    if (regenAmount > 0) {
+      state.battleLog.push({
+        turn: state.turn,
+        actor: stepling.name,
+        action: 'regen',
+        target: stepling.name,
+        value: regenAmount,
+        timestamp: new Date()
+      });
+    }
+    
+    // 2. Attack
+    const damage = stepling.stats.attack;
+    state.boss.currentHP -= damage;
+    state.totalDamage += damage;
+    state.battleLog.push({
+      turn: state.turn,
+      actor: stepling.name,
+      action: 'attack',
+      target: 'Boss',
+      value: damage,
+      timestamp: new Date()
+    });
+    
+    // 3. Lifesteal
+    const lifestealAmount = this.applyLifesteal(stepling, damage);
+    if (lifestealAmount > 0) {
+      state.battleLog.push({
+        turn: state.turn,
+        actor: stepling.name,
+        action: 'lifesteal',
+        target: stepling.name,
+        value: lifestealAmount,
+        timestamp: new Date()
+      });
+    }
+  }
+  
+  private executeBossTurn(boss: Boss, team: BattleTeam, state: BattleState): void {
+    const activeRow = this.getActiveRow(team.formation);
+    const target = this.selectTarget(activeRow);
+    const damage = this.calculateDamage(boss, target);
+    
+    target.currentHP -= damage;
+    state.battleLog.push({
+      turn: state.turn,
+      actor: 'Boss',
+      action: 'attack',
+      target: target.name,
+      value: damage,
+      timestamp: new Date()
+    });
+    
+    if (target.currentHP <= 0) {
+      state.battleLog.push({
+        turn: state.turn,
+        actor: target.name,
+        action: 'death',
+        target: target.name,
+        value: 0,
+        timestamp: new Date()
+      });
+    }
+  }
 }
 ```
 
+#### Scoring System
+```typescript
+interface BattleResult {
+  victory: boolean;
+  turnsSurvived: number;
+  totalDamage: number;
+  score: number; // totalDamage (1 damage = 1 point)
+  gemsEarned: number; // score / 100
+  newTierUnlocked?: number;
+  battleLog: BattleEvent[];
+}
+
+interface LeaderboardEntry {
+  playerId: string;
+  playerName: string;
+  bossTier: number;
+  score: number;
+  turnsSurvived: number;
+  timestamp: Date;
+  teamSnapshot: string[]; // Stepling names
+}
+
+interface Leaderboard {
+  global: LeaderboardEntry[]; // All-time best
+  daily: LeaderboardEntry[];  // Resets every 24 hours
+  weekly: LeaderboardEntry[]; // Resets every 7 days
+}
+
+class ScoringSystem {
+  calculateScore(totalDamage: number): number {
+    return totalDamage; // Simple: 1 damage = 1 point
+  }
+  
+  calculateGems(score: number): number {
+    return Math.floor(score / 100); // 100 points = 1 gem
+  }
+  
+  checkTierUnlock(turnsSurvived: number, currentMaxTier: number): number | null {
+    const unlocks = [
+      { tier: 2, turns: 10 },
+      { tier: 3, turns: 20 },
+      { tier: 4, turns: 30 },
+      { tier: 5, turns: 40 }
+    ];
+    
+    for (const unlock of unlocks) {
+      if (turnsSurvived >= unlock.turns && unlock.tier > currentMaxTier) {
+        return unlock.tier;
+      }
+    }
+    return null;
+  }
+}
+```
+
+### Backend Service Interfaces
+
+#### Battle Service
+```typescript
+interface BattleService {
+  startBattle(playerId: string, teamIds: string[], bossTier: number): Promise<BattleState>;
+  simulateBattle(battleId: string): Promise<BattleResult>;
+  getLeaderboard(bossTier: number, type: 'global' | 'daily' | 'weekly'): Promise<LeaderboardEntry[]>;
+  getPlayerBestScores(playerId: string): Promise<Map<number, number>>;
+  updateLeaderboard(playerId: string, result: BattleResult): Promise<void>;
+}
+
+interface BattleRepository {
+  saveBattleResult(playerId: string, result: BattleResult): Promise<void>;
+  getLeaderboard(tier: number, type: string, limit: number): Promise<LeaderboardEntry[]>;
+  getPlayerMaxTier(playerId: string): Promise<number>;
+  updatePlayerMaxTier(playerId: string, tier: number): Promise<void>;
+}
+```
+
+### Data Models
+
+#### Battle Tables
+```sql
+CREATE TABLE battle_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID REFERENCES players(id) NOT NULL,
+    boss_tier INTEGER NOT NULL CHECK (boss_tier BETWEEN 1 AND 5),
+    victory BOOLEAN NOT NULL,
+    turns_survived INTEGER NOT NULL,
+    total_damage BIGINT NOT NULL,
+    score BIGINT NOT NULL,
+    gems_earned INTEGER NOT NULL,
+    team_snapshot JSONB NOT NULL, -- Array of stepling IDs and stats
+    battle_log JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_battle_results_player ON battle_results(player_id);
+CREATE INDEX idx_battle_results_tier_score ON battle_results(boss_tier, score DESC);
+CREATE INDEX idx_battle_results_created ON battle_results(created_at DESC);
+
+CREATE TABLE leaderboards (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID REFERENCES players(id) NOT NULL,
+    player_name VARCHAR(100) NOT NULL,
+    boss_tier INTEGER NOT NULL CHECK (boss_tier BETWEEN 1 AND 5),
+    score BIGINT NOT NULL,
+    turns_survived INTEGER NOT NULL,
+    team_snapshot JSONB NOT NULL,
+    leaderboard_type VARCHAR(20) NOT NULL CHECK (leaderboard_type IN ('global', 'daily', 'weekly')),
+    period_start DATE NOT NULL, -- For daily/weekly tracking
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(player_id, boss_tier, leaderboard_type, period_start)
+);
+
+CREATE INDEX idx_leaderboards_tier_type_score ON leaderboards(boss_tier, leaderboard_type, score DESC);
+CREATE INDEX idx_leaderboards_period ON leaderboards(period_start);
+
+CREATE TABLE player_boss_progress (
+    player_id UUID PRIMARY KEY REFERENCES players(id),
+    max_tier_unlocked INTEGER DEFAULT 1 CHECK (max_tier_unlocked BETWEEN 1 AND 5),
+    best_scores JSONB DEFAULT '{}', -- Map of tier -> best score
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### Gem Currency
+```sql
+-- Add gems and energy columns to players table
+ALTER TABLE players ADD COLUMN gems INTEGER DEFAULT 0 CHECK (gems >= 0);
+ALTER TABLE players ADD COLUMN energy_current INTEGER DEFAULT 10 CHECK (energy_current >= 0 AND energy_current <= energy_max);
+ALTER TABLE players ADD COLUMN energy_max INTEGER DEFAULT 10 CHECK (energy_max > 0);
+ALTER TABLE players ADD COLUMN energy_last_regen_time TIMESTAMP DEFAULT NOW();
+ALTER TABLE players ADD COLUMN energy_last_step_count INTEGER DEFAULT 0;
+
+CREATE TABLE gem_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID REFERENCES players(id) NOT NULL,
+    amount INTEGER NOT NULL, -- Positive for earned, negative for spent
+    source VARCHAR(50) NOT NULL, -- 'battle', 'store_purchase', 'store_spend', etc.
+    reference_id UUID, -- Battle result ID or store transaction ID
+    balance_after INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_gem_transactions_player ON gem_transactions(player_id, created_at DESC);
+```
+
+### API Endpoints
+
+```typescript
+// Get player energy status
+GET /api/player/energy
+Response: {
+  current: number;
+  max: number;
+  timeUntilNextRegen: number; // milliseconds
+  lastRegenTime: Date;
+}
+
+// Update energy (called on step sync)
+POST /api/player/energy/update
+Request: {
+  currentSteps: number;
+}
+Response: {
+  energy: PlayerEnergy;
+  passiveRegenAmount: number;
+  activeRegenAmount: number;
+}
+
+// Start a new battle
+POST /api/battle/start
+Request: {
+  teamIds: string[]; // Exactly 10 stepling IDs
+  formation: {
+    front: number[]; // Indices 0-2
+    middle: number[]; // Indices 3-5
+    back: number[]; // Indices 6-9
+  };
+  bossTier: number; // 1-5
+}
+Response: {
+  battleId: string;
+  initialState: BattleState;
+  energyRemaining: number;
+}
+Errors: {
+  INSUFFICIENT_ENERGY: "Not enough energy to start battle"
+}
+
+// Simulate battle (server-side calculation)
+POST /api/battle/simulate
+Request: {
+  battleId: string;
+}
+Response: {
+  result: BattleResult;
+  leaderboardRank?: number;
+}
+
+// Get leaderboard
+GET /api/battle/leaderboard/:tier/:type
+Params: {
+  tier: 1-5
+  type: 'global' | 'daily' | 'weekly'
+}
+Query: {
+  limit?: number (default 100)
+  offset?: number (default 0)
+}
+Response: {
+  entries: LeaderboardEntry[];
+  playerRank?: number;
+  playerScore?: number;
+}
+
+// Get player progress
+GET /api/battle/progress
+Response: {
+  maxTierUnlocked: number;
+  bestScores: Map<number, number>; // tier -> score
+  totalBattles: number;
+  totalVictories: number;
+  totalGemsEarned: number;
+}
+
+// Get player gems balance
+GET /api/player/gems
+Response: {
+  balance: number;
+  recentTransactions: GemTransaction[];
+}
+```
+
+### Battle System Mechanics
+
+#### Team Positioning Algorithm
 ### Guild System Specifications
 
 #### Guild Management

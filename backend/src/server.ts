@@ -18,6 +18,8 @@ import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { database } from './config/database';
 import { steplingService } from './services/steplingService';
+import { energyController } from './controllers/energyController';
+import { battleController } from './controllers/battleController';
 
 // Load environment variables
 dotenv.config();
@@ -691,6 +693,15 @@ app.use('/api/game', gameRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/achievements', lifetimeAchievementRoutes);
 // app.use('/api/steplings', steplingRoutes); // Temporarily disabled due to auth issues
+
+// Energy routes
+app.get('/api/player/energy', energyController.getEnergy.bind(energyController));
+app.post('/api/player/energy/update', energyController.updateEnergy.bind(energyController));
+
+// Battle routes
+app.post('/api/battle/start', battleController.startBattle.bind(battleController));
+app.post('/api/battle/simulate', battleController.simulateBattle.bind(battleController));
+app.get('/api/battle/progress', battleController.getProgress.bind(battleController));
 
 // Game State Sync Endpoints
 app.get('/api/players/:playerId/gamestate', async (req, res) => {

@@ -156,19 +156,58 @@
   - Add creator reward system for selected submissions
   - _Requirements: 10.9, 10.13_
 
-- [ ] 7. Build battle system and boss encounters
-- [ ] 7.1 Implement team positioning and battle mechanics
-  - Create automatic team positioning based on defense stats
-  - Build position bonus system (front/middle/back row advantages)
-  - Implement battle calculation engine with stat-based outcomes
-  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+- [ ] 7. Build PvE Boss Battle system
+- [ ] 7.0 Implement energy system
+  - Add energy tracking to player data (current, max, last_regen_time)
+  - Build passive energy regeneration (1 per 30 minutes)
+  - Build active energy regeneration (1 per 1,000 steps)
+  - Create energy display UI component
+  - Add energy cost validation before battle initiation
+  - _Requirements: 6.13, 6.14, 6.15, 6.16, 6.17, 6.18_
 
-- [ ] 7.2 Create boss encounter system
-  - Design boss templates with scaling difficulty
-  - Implement boss stat scaling based on player progression
-  - Build reward system tied to boss difficulty and performance
-  - Add boss unlock requirements and progression gates
-  - _Requirements: 6.5_
+- [ ] 7.1 Create team formation and battle initialization
+  - Build team selection interface for 10 steplings
+  - Implement 3-row formation system (3/3/4 layout)
+  - Create boss tier selection with unlock status display
+  - Initialize battle state with team and boss stats
+  - Deduct 1 energy on battle start
+  - _Requirements: 6.1, 6.2, 6.3, 6.13_
+
+- [ ] 7.2 Implement turn-based combat engine
+  - Build speed-based turn order calculation system
+  - Implement stepling turn logic (regen → attack → lifesteal)
+  - Implement boss turn logic (row-based targeting and damage calculation)
+  - Create combat loop that processes turns until victory/defeat
+  - _Requirements: 6.5, 6.6, 6.7, 6.8, 6.9_
+
+- [ ] 7.3 Build boss scaling and tier system
+  - Implement per-turn boss stat scaling (+10% HP/ATK, +5% SPD)
+  - Create 5 boss tiers with appropriate starting stats
+  - Build tier unlock system based on turn survival thresholds
+  - Add tier difficulty multipliers (3x per tier)
+  - _Requirements: 6.2, 6.3, 6.4_
+
+- [ ] 7.4 Create scoring and leaderboard system
+  - Implement damage tracking and point calculation
+  - Build global, daily, and weekly leaderboards per tier
+  - Create leaderboard display with rankings and scores
+  - Add personal best tracking per boss tier
+  - _Requirements: 6.10, 6.11_
+
+- [ ] 7.5 Build battle UI and visualization
+  - Create battle screen with boss HP, turn counter, and damage display
+  - Implement row-based stepling positioning visualization
+  - Build turn order indicator showing next combatants
+  - Add battle log showing recent actions and damage numbers
+  - Create post-battle results screen with score and rewards
+  - _Requirements: 6.1, 6.9, 6.10_
+
+- [ ] 7.6 Implement gem rewards system (foundation)
+  - Create gem currency tracking in player data
+  - Implement point-to-gem conversion (100 points = 1 gem)
+  - Build gem award system after battle completion
+  - Add gem balance display in UI
+  - _Requirements: 6.12_
 
 - [ ] 8. Develop guild system and social features
 - [ ] 8.1 Create guild management system
