@@ -2815,6 +2815,102 @@ async function initializeGoogleFit() {
                 }
             },
             
+            async getHistoricalSteps(daysBack = 7) {
+                if (!this.accessToken) {
+                    throw new Error('Not authorized - please connect to Google Fit first');
+                }
+                
+                const today = new Date();
+                const endOfToday = new Date(today);
+                endOfToday.setHours(23, 59, 59, 999);
+                
+                const startDate = new Date(today);
+                startDate.setDate(startDate.getDate() - daysBack);
+                startDate.setHours(0, 0, 0, 0);
+
+                const request = {
+                    aggregateBy: [{
+                        dataTypeName: 'com.google.step_count.delta'
+                    }],
+                    bucketByTime: { durationMillis: 86400000 }, // 1 day buckets
+                    startTimeMillis: startDate.getTime(),
+                    endTimeMillis: endOfToday.getTime()
+                };
+
+                try {
+                    const response = await window.gapi.client.request({
+                        path: 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+                        method: 'POST',
+                        body: request,
+                        headers: {
+                            'Authorization': `Bearer ${this.accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    let totalSteps = 0;
+                    const dailyBreakdown = [];
+                    
+                    if (response.result.bucket && response.result.bucket.length > 0) {
+                        response.result.bucket.forEach(bucket => {
+                            let daySteps = 0;
+                            if (bucket.dataset && bucket.dataset.length > 0) {
+                                bucket.dataset.forEach(dataset => {
+                                    if (dataset.point && dataset.point.length > 0) {
+                                        dataset.point.forEach(point => {
+                                            if (point.value && point.value.length > 0) {
+                                                daySteps += point.value[0].intVal || 0;
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                            totalSteps += daySteps;
+                            dailyBreakdown.push({
+                                date: new Date(bucket.startTimeMillis),
+                                steps: daySteps
+                            });
+                        });
+                    }
+
+                    return { totalSteps, dailyBreakdown };
+                } catch (error) {
+                    // If token is invalid, try refresh token first
+                    if (error.status === 401 || error.status === 403) {
+                        log('🔄 Token expired, attempting refresh...');
+                        this.accessToken = null;
+                        localStorage.removeItem('googleFitToken');
+                        localStorage.removeItem('googleFitTokenExpiry');
+                        
+                        // Try refresh token first
+                        const refreshToken = localStorage.getItem('googleFitRefreshToken');
+                        if (refreshToken) {
+                            const refreshed = await this.refreshWithRefreshToken();
+                            if (refreshed) {
+                                // Retry the request with new token
+                                return await this.getCurrentSteps();
+                            }
+                        }
+                        
+                        // Fall back to silent refresh
+                        try {
+                            const refreshed = await this.requestPermission(true);
+                            if (refreshed) {
+                                // Retry the request with new token
+                                return await this.getCurrentSteps();
+                            } else {
+                                updateGoogleFitStatus(false);
+                                throw new Error('Google Fit session expired - please reconnect');
+                            }
+                        } catch (refreshError) {
+                            updateGoogleFitStatus(false);
+                            throw new Error('Google Fit session expired - please reconnect');
+                        }
+                    }
+                    throw error;
+                }
+            },
+            
             disconnect() {
                 this.accessToken = null;
                 localStorage.removeItem('googleFitToken');
@@ -2895,8 +2991,50 @@ async function loadGoogleFitData() {
         
         log('📊 Loading step data from Google Fit...');
         
+        // Check if we missed any days (last sync was not today)
+        const lastSyncDate = localStorage.getItem('lastStepSyncDate');
+        const todayString = getTodayDateString();
+        
+        if (lastSyncDate && lastSyncDate !== todayString) {
+            // Calculate days missed
+            const lastSync = new Date(lastSyncDate);
+            const today = new Date(todayString);
+            const daysMissed = Math.floor((today - lastSync) / (1000 * 60 * 60 * 24));
+            
+            if (daysMissed > 0 && daysMissed <= 30) {
+                log('🔄 Syncing ' + daysMissed + ' missed day(s) of steps...');
+                
+                try {
+                    const historical = await googleFitService.getHistoricalSteps(daysMissed);
+                    
+                    if (historical.totalSteps > 0) {
+                        // Add all missed steps to lifetime total
+                        game.steps += historical.totalSteps;
+                        log('📊 Added ' + historical.totalSteps + ' steps from ' + daysMissed + ' missed day(s)!');
+                        
+                        // Show daily breakdown
+                        historical.dailyBreakdown.forEach(day => {
+                            if (day.steps > 0) {
+                                const dateStr = day.date.toLocaleDateString();
+                                log('  📅 ' + dateStr + ': ' + day.steps + ' steps');
+                            }
+                        });
+                        
+                        // Check for new achievements
+                        checkNewAchievements();
+                    }
+                } catch (error) {
+                    log('⚠️ Could not sync historical data: ' + error.message);
+                }
+            }
+        }
+        
+        // Now sync today's steps
         const totalStepsToday = await googleFitService.getCurrentSteps();
         log('📱 Google Fit: ' + totalStepsToday + ' steps today');
+        
+        // Store last sync date
+        localStorage.setItem('lastStepSyncDate', todayString);
         
         // Update daily steps and get the difference for processing
         const oldDailySteps = getDailySteps();
